@@ -69,7 +69,7 @@ const LocationServicesPage: React.FC = () => {
         window.goongJs.accessToken = GOONG_MAPTILES_KEY;
         mapInstance.current = new window.goongJs.Map({
             container: mapRef.current,
-            style: 'https://maps.goong.io/assets/goong_map_web.json',
+            style: 'https://tiles.goong.io/assets/goong_map_web.json',
             center: [105.8342, 21.0278], // Default to Hanoi
             zoom: 12,
         });
