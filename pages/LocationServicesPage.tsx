@@ -1,4 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import goongJs from '@goongmaps/goong-js';
+import GoongSdk from '@goongmaps/goong-sdk';
+import GoongDirections from '@goongmaps/goong-sdk/services/directions';
+import GoongGeocoding from '@goongmaps/goong-sdk/services/geocoding';
+import '@goongmaps/goong-js/dist/goong-js.css';
+
 import { LocationInfo, SavedLocation } from '../types';
 import Button from '../components/common/Button';
 import { MapPinIcon, HomeIcon, ArrowPathIcon, SpeakerWaveIcon, BookmarkSquareIcon, TrashIcon, PencilIcon } from '../constants';
@@ -27,12 +33,11 @@ const LocationServicesPage: React.FC = () => {
 
   // Map-specific state and refs
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<any>(null); // goongJs.Map
-  const userMarker = useRef<any>(null); // goongJs.Marker
-  const [isApiReady, setIsApiReady] = useState(false);
+  const mapInstance = useRef<goongJs.Map | null>(null);
+  const userMarker = useRef<goongJs.Marker | null>(null);
   const [destination, setDestination] = useState('');
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
-  const [routeDirections, setRouteDirections] = useState<any[] | null>(null); // Goong directions steps
+  const [routeDirections, setRouteDirections] = useState<any[] | null>(null);
 
   // Modal State for saving/editing locations
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -41,33 +46,15 @@ const LocationServicesPage: React.FC = () => {
 
   // --- Map and Location Logic ---
 
-  // Effect to check for Goong SDK availability
   useEffect(() => {
     if (!GOONG_API_KEY || !GOONG_MAPTILES_KEY) {
       setError(t('mapApiKeyError'));
-      setIsApiReady(false);
       return;
     }
-    // Check if the Goong script has loaded
-    if (window.goongJs && window.goongsdk) {
-      setIsApiReady(true);
-    } else {
-      // Poll for the script
-      const interval = setInterval(() => {
-        if (window.goongJs && window.goongsdk) {
-          setIsApiReady(true);
-          clearInterval(interval);
-        }
-      }, 100);
-      return () => clearInterval(interval);
-    }
-  }, [t]);
-
-  // Effect to initialize the map object once the API script is loaded
-  useEffect(() => {
-    if (isApiReady && mapRef.current && !mapInstance.current) {
-        window.goongJs.accessToken = GOONG_MAPTILES_KEY;
-        mapInstance.current = new window.goongJs.Map({
+    
+    if (mapRef.current && !mapInstance.current) {
+        goongJs.accessToken = GOONG_MAPTILES_KEY;
+        mapInstance.current = new goongJs.Map({
             container: mapRef.current,
             style: 'https://tiles.goong.io/assets/goong_map_web.json',
             center: [105.8342, 21.0278], // Default to Hanoi
@@ -82,7 +69,7 @@ const LocationServicesPage: React.FC = () => {
         mapInstance.current = null;
       }
     }
-  }, [isApiReady]);
+  }, [t]);
 
   // Fetch Current Location
   const handleFetchLocation = useCallback(() => {
@@ -93,9 +80,7 @@ const LocationServicesPage: React.FC = () => {
         const loc: LocationInfo = { latitude: position.coords.latitude, longitude: position.coords.longitude };
         setCurrentLocation(loc);
         setIsLoadingLocation(false);
-        if (!GOONG_API_KEY) {
-            setError(t('mapApiKeyError'));
-        } else {
+        if (GOONG_API_KEY) {
             setNotification({ message: t('locationRefreshedSuccess'), type: 'success'});
         }
       },
@@ -121,7 +106,7 @@ const LocationServicesPage: React.FC = () => {
       mapInstance.current.flyTo({ center: userPos, zoom: 16 });
 
       if (!userMarker.current) {
-        userMarker.current = new window.goongJs.Marker()
+        userMarker.current = new goongJs.Marker()
           .setLngLat(userPos)
           .addTo(mapInstance.current);
       } else {
@@ -145,13 +130,14 @@ const LocationServicesPage: React.FC = () => {
 
   const calculateAndDisplayRoute = useCallback(async (origin: LocationInfo | null, destinationInfo: LocationInfo | string) => {
     if (!origin) { setNotification({ message: t('guideHomeError'), type: 'error' }); return; }
-    if (!isApiReady || !GOONG_API_KEY) return;
+    if (!GOONG_API_KEY) return;
     
     setIsCalculatingRoute(true);
     removeRouteFromMap();
 
-    const geocodingService = new window.goongsdk.Geocoding({ apiKey: GOONG_API_KEY });
-    const directionsService = new window.goongsdk.Directions({ apiKey: GOONG_API_KEY });
+    const baseClient = GoongSdk({ accessToken: GOONG_API_KEY });
+    const geocodingService = GoongGeocoding(baseClient);
+    const directionsService = GoongDirections(baseClient);
 
     let destCoordinates: {latitude: number, longitude: number};
 
@@ -196,7 +182,7 @@ const LocationServicesPage: React.FC = () => {
                     'paint': { 'line-color': '#4f46e5', 'line-width': 6, 'line-opacity': 0.9 }
                 });
 
-                const bounds = new window.goongJs.LngLatBounds(geometry.coordinates[0], geometry.coordinates[0]);
+                const bounds = new goongJs.LngLatBounds(geometry.coordinates[0], geometry.coordinates[0]);
                 for (const coord of geometry.coordinates) {
                   bounds.extend(coord);
                 }
@@ -215,7 +201,7 @@ const LocationServicesPage: React.FC = () => {
         setIsCalculatingRoute(false);
         setNotification({ message: err.message || t('directionsError'), type: 'error' });
     }
-  }, [isApiReady, removeRouteFromMap, speak, t, ttsSupported]);
+  }, [removeRouteFromMap, speak, t, ttsSupported]);
 
   // --- User Actions ---
   const handleOpenSaveModal = (locationToEdit: SavedLocation | null) => {
@@ -321,7 +307,7 @@ const LocationServicesPage: React.FC = () => {
       
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div ref={mapRef} className="w-full h-64 md:h-96 bg-slate-200 flex items-center justify-center text-slate-500" role="application" aria-label="Interactive Map">
-            {!isApiReady && !error && <span>{t('findingLocation')}</span>}
+            {isLoadingLocation && !error && <span>{t('findingLocation')}</span>}
             {error && <span className="p-4 text-center">{error}</span>}
         </div>
          <div className="p-4 md:p-6">
@@ -334,9 +320,9 @@ const LocationServicesPage: React.FC = () => {
               </div>
             )}
             <div className="mt-4 flex flex-wrap gap-3">
-              <Button onClick={handleFetchLocation} isLoading={isLoadingLocation} leftIcon={<ArrowPathIcon className="w-5 h-5"/>} size="md" disabled={!isApiReady}>{t('refreshLocationButton')}</Button>
-              <Button onClick={handleSetHome} disabled={!currentLocation || isLoadingLocation || !isApiReady} leftIcon={<HomeIcon className="w-5 h-5"/>} size="md" variant="secondary">{t('setHomeButton')}</Button>
-              <Button onClick={() => handleOpenSaveModal(null)} disabled={!currentLocation || isLoadingLocation || !isApiReady} leftIcon={<BookmarkSquareIcon className="w-5 h-5"/>} size="md" variant="primary">{t('saveLocationButton')}</Button>
+              <Button onClick={handleFetchLocation} isLoading={isLoadingLocation} leftIcon={<ArrowPathIcon className="w-5 h-5"/>} size="md">{t('refreshLocationButton')}</Button>
+              <Button onClick={handleSetHome} disabled={!currentLocation || isLoadingLocation} leftIcon={<HomeIcon className="w-5 h-5"/>} size="md" variant="secondary">{t('setHomeButton')}</Button>
+              <Button onClick={() => handleOpenSaveModal(null)} disabled={!currentLocation || isLoadingLocation} leftIcon={<BookmarkSquareIcon className="w-5 h-5"/>} size="md" variant="primary">{t('saveLocationButton')}</Button>
             </div>
             {homeLocation && <p className="text-xs text-slate-500 mt-3">{t('homeSetLocationInfo', homeLocation.latitude.toFixed(4), homeLocation.longitude.toFixed(4))}</p>}
          </div>
@@ -347,11 +333,11 @@ const LocationServicesPage: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-4 items-end">
           <div className="w-full md:flex-1">
             <label htmlFor="destinationInput" className="block text-sm font-medium text-slate-700 mb-1">{t('destinationLabel')}</label>
-            <input type="text" id="destinationInput" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder={t('destinationPlaceholder')} className={formInputStyle} aria-label={t('destinationLabel')} disabled={!isApiReady} />
+            <input type="text" id="destinationInput" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder={t('destinationPlaceholder')} className={formInputStyle} aria-label={t('destinationLabel')} />
           </div>
           <div className="flex items-end gap-3 w-full md:w-auto">
-            <Button onClick={handleGuideToDestination} disabled={!isApiReady || !currentLocation || isCalculatingRoute || !destination.trim()} isLoading={isCalculatingRoute && !!destination.trim()} leftIcon={<MapPinIcon className="w-5 h-5"/>} size="md" variant="secondary" className="flex-1 md:flex-initial">{t('guideToDestinationButton')}</Button>
-            <Button onClick={handleGuideHome} disabled={!isApiReady || !homeLocation || !currentLocation || isCalculatingRoute} isLoading={isCalculatingRoute && !destination.trim()} leftIcon={<HomeIcon className="w-5 h-5"/>} size="md" variant="primary" className="flex-1 md:flex-initial">{t('guideHomeButton')}</Button>
+            <Button onClick={handleGuideToDestination} disabled={!currentLocation || isCalculatingRoute || !destination.trim()} isLoading={isCalculatingRoute && !!destination.trim()} leftIcon={<MapPinIcon className="w-5 h-5"/>} size="md" variant="secondary" className="flex-1 md:flex-initial">{t('guideToDestinationButton')}</Button>
+            <Button onClick={handleGuideHome} disabled={!homeLocation || !currentLocation || isCalculatingRoute} isLoading={isCalculatingRoute && !destination.trim()} leftIcon={<HomeIcon className="w-5 h-5"/>} size="md" variant="primary" className="flex-1 md:flex-initial">{t('guideHomeButton')}</Button>
           </div>
         </div>
 
@@ -382,7 +368,7 @@ const LocationServicesPage: React.FC = () => {
                   <span className="font-medium text-slate-800 break-all">{place.name}</span>
                 </div>
                 <div className="flex space-x-2 flex-shrink-0 self-end sm:self-center">
-                  <Button onClick={() => calculateAndDisplayRoute(currentLocation, place.location)} disabled={!currentLocation || isCalculatingRoute || !isApiReady} size="sm" variant="ghost">{t('guideHereButton')}</Button>
+                  <Button onClick={() => calculateAndDisplayRoute(currentLocation, place.location)} disabled={!currentLocation || isCalculatingRoute} size="sm" variant="ghost">{t('guideHereButton')}</Button>
                   <Button onClick={() => handleOpenSaveModal(place)} variant="secondary" size="sm" aria-label={`Edit ${place.name}`}><PencilIcon className="w-5 h-5" /></Button>
                   <Button onClick={() => handleDeleteLocation(place.id)} variant="danger" size="sm" aria-label={`Delete ${place.name}`}><TrashIcon className="w-5 h-5" /></Button>
                 </div>
