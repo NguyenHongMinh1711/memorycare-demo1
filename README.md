@@ -1,1 +1,3 @@
-**Prerequisites:**  Node.js
+GEMINI_API_KEY
+GOONG_API_KEY
+GOONG_MAPTILES_KEY
