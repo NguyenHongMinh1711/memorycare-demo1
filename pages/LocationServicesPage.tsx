@@ -10,6 +10,7 @@ import Modal from '../components/common/Modal';
 import { useTranslation } from '../contexts';
 
 const GOONG_API_KEY = process.env.GOONG_API_KEY;
+const GOONG_MAPTILES_KEY = process.env.GOONG_MAPTILES_KEY;
 
 const LocationServicesPage: React.FC = () => {
   const { t } = useTranslation();
@@ -42,7 +43,7 @@ const LocationServicesPage: React.FC = () => {
 
   // Effect to check for Goong SDK availability
   useEffect(() => {
-    if (!GOONG_API_KEY) {
+    if (!GOONG_API_KEY || GOONG_MAPTILES_KEY) {
       setError(t('mapApiKeyError'));
       setIsApiReady(false);
       return;
@@ -65,7 +66,7 @@ const LocationServicesPage: React.FC = () => {
   // Effect to initialize the map object once the API script is loaded
   useEffect(() => {
     if (isApiReady && mapRef.current && !mapInstance.current) {
-        window.goongJs.accessToken = GOONG_API_KEY;
+        window.goongJs.accessToken = GOONG_MAPTILES_KEY;
         mapInstance.current = new window.goongJs.Map({
             container: mapRef.current,
             style: 'https://maps.goong.io/assets/goong_map_web.json',
