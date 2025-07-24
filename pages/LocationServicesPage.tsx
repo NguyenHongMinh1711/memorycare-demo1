@@ -43,7 +43,7 @@ const LocationServicesPage: React.FC = () => {
 
   // Effect to check for Goong SDK availability
   useEffect(() => {
-    if (!GOONG_API_KEY || GOONG_MAPTILES_KEY) {
+    if (!GOONG_API_KEY || !GOONG_MAPTILES_KEY) {
       setError(t('mapApiKeyError'));
       setIsApiReady(false);
       return;
