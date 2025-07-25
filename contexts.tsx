@@ -380,7 +380,7 @@ const translations = {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useLocalStorage<Language>('language', 'en');
+  const [language, setLanguage] = useLocalStorage<Language>('language', 'vi');
 
   const t = useCallback((key: keyof typeof translations['en'], ...args: (string | number)[]) => {
     let translation = translations[language]?.[key] || translations['en'][key];
