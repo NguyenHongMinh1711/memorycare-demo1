@@ -121,7 +121,7 @@ export const PencilIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 
 export const Cog6ToothIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-1.007 1.11-1.226l.003-.002L12 2.5l.544.212c.55.219 1.02.684 1.11 1.226l.003.002L14.5 5.5l1.25.5c.55.22 1.02.684 1.11 1.226l.003.002L17.5 8.5l.5 1.25c.22.55.22 1.154 0 1.704l-.003.002L17.5 13l-.5 1.25c-.09.542-.56 1.007-1.11 1.226l-.003.002L14.5 16.5l-1.25.5c-.55.22-1.02.684-1.11 1.226l-.003.002L12 19.5l-.544-.212c-.55-.219-1.02-.684-1.11-1.226l-.003-.002L9.5 16.5l-1.25-.5c-.55-.22-1.02-.684-1.11-1.226l-.003-.002L6.5 13l-.5-1.25c-.22-.55-.22-1.154 0-1.704l.003-.002L6.5 8.5l.5-1.25c.09-.542.56-1.007 1.11-1.226l.003-.002L9.5 5.5l1.25-.5z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-1.007 1.11-1.226l.003-.002L12 2.5l.544.212c.55.219 1.02.684 1.11 1.226l.003.002L14.5 5.5l1.25.5c.55.22 1.02.684 1.11 1.226l.003.002L17.5 8.5l.5 1.25c.22.55.22 1.154 0 1.704l-.003.002L17.5 13l-.5 1.25c-.09.542-.56 1.007-1.11 1.226l-.003.002L14.5 16.5l-1.25.5c-.55.22-1.02.684-1.11 1.226l-.003.002L12 19.5l-.544-.212c-.55-.219-1.02-.684-1.11-1.226l-.003-.002L9.5 16.5l-1.25-.5c-.55-.22-1.02.684-1.11-1.226l-.003-.002L6.5 13l-.5-1.25c-.22-.55-.22-1.154 0-1.704l.003-.002L6.5 8.5l.5-1.25c.09-.542.56-1.007 1.11-1.226l.003-.002L9.5 5.5l1.25-.5z" />
     <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 );
@@ -135,5 +135,11 @@ export const ArrowDownTrayIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props
 export const ArrowUpTrayIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+  </svg>
+);
+
+export const ChatBubbleLeftRightIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193l-3.722.534a.75.75 0 01-.806-.748l.003-.972a3.75 3.75 0 00-2.28-3.465c.612-.25.98-.87.98-1.542a3.75 3.75 0 00-1.53-2.921.75.75 0 01-.617-1.223L11.25 6.75a.75.75 0 00-1.5 0l-1.936 2.68c-.28.386-.234.951.116 1.284a3.75 3.75 0 001.246 4.331c-.326.233-.692.42-1.09.55l-3.722.534A2.001 2.001 0 012.25 15.286v-4.286c0-.97.616-1.813 1.5-2.097L6 8.25m8.25 2.25h-5.25m5.25 0a2.25 2.25 0 012.25 2.25v.891a2.25 2.25 0 01-2.25 2.25h-5.25a2.25 2.25 0 01-2.25-2.25v-.891a2.25 2.25 0 012.25-2.25h5.25z" />
   </svg>
 );
