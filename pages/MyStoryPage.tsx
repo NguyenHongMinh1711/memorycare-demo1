@@ -3,7 +3,7 @@ import useLocalStorage from '../hooks/useLocalStorage';
 import PageHeader from '../components/common/PageHeader';
 import Button from '../components/common/Button';
 import { useTranslation } from '../contexts';
-import { ChatBubbleLeftRightIcon, MicrophoneIcon } from '../constants';
+import { PencilIcon, MicrophoneIcon } from '../constants';
 import { generateMyStory, generateMyStoryQuestion } from '../services/geminiService';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import NotificationBanner from '../components/common/NotificationBanner';
@@ -82,7 +82,7 @@ const MyStoryPage: React.FC = () => {
       <PageHeader 
         title={t('pageTitleMyStory')} 
         subtitle={t('pageSubtitleMyStory')} 
-        icon={<ChatBubbleLeftRightIcon className="w-10 h-10" />} 
+        icon={<PencilIcon className="w-10 h-10" />} 
       />
 
       {notification && <NotificationBanner message={notification.message} type={notification.type} onDismiss={() => setNotification(null)} />}
