@@ -125,17 +125,17 @@ const ActivityPlannerPage: React.FC = () => {
 
   const handleRemind = useCallback((activity: Activity) => {
     const reminderText = t('activityReminderSpeech', activity.name, activity.time, activity.description || '');
+    
+    // Show the reminder text in the notification banner.
+    setNotification({ message: reminderText, type: 'info' });
+
     if (ttsSupported) {
-      speak(reminderText, {
-        onLanguageUnavailable: () => {
-          setNotification({ message: t('ttsLanguageUnavailableError'), type: 'error'});
-          alert(reminderText); // Fallback to alert if voice is unavailable
-        }
-      });
-      setNotification({ message: t('remindSentInfo', activity.name), type: 'info'});
-    } else {
-      alert(reminderText);
-      setNotification({ message: t('ttsAlertMessage'), type: 'info'});
+        speak(reminderText, {
+            onLanguageUnavailable: () => {
+                // This will replace the info banner with an error, which is acceptable.
+                setNotification({ message: t('ttsLanguageUnavailableError'), type: 'error' });
+            }
+        });
     }
   }, [ttsSupported, speak, setNotification, t]);
 
@@ -163,6 +163,9 @@ const ActivityPlannerPage: React.FC = () => {
     const timeoutIds: number[] = [];
 
     activities.forEach(activity => {
+      // Don't set reminders for recurring activities in the past for the same day
+      if (activity.isRecurring) return;
+
       const [hours, minutes] = activity.time.split(':').map(Number);
       if (isNaN(hours) || isNaN(minutes)) return;
 

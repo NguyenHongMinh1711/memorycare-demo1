@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { Person, JournalEntry } from '../types';
 import Button from '../components/common/Button';
@@ -11,6 +11,51 @@ import NotificationBanner from '../components/common/NotificationBanner';
 import { useTranslation } from '../contexts';
 import { generateTagsForJournal } from '../services/geminiService';
 import AIAssistant from '../components/AIAssistant';
+
+const compressImage = (file: File, maxSize: number = 400): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      if (!event.target?.result) {
+          return reject(new Error("FileReader did not return a result."));
+      }
+      const img = new Image();
+      img.src = event.target.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height *= maxSize / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width *= maxSize / height;
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            return reject(new Error('Could not get canvas context'));
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        resolve(dataUrl);
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
+
 
 const PersonCard: React.FC<{ person: Person; onDelete: (id: string) => void; onSpeak: (text: string) => void; onEdit: (person: Person) => void; }> = ({ person, onDelete, onSpeak, onEdit }) => {
   const { t } = useTranslation();
@@ -55,6 +100,21 @@ const AddPersonForm: React.FC<AddPersonFormProps> = ({ onSave, onClose, existing
   const [keyInfo, setKeyInfo] = useState(existingPerson?.keyInfo || '');
   const { t } = useTranslation();
   const isEditMode = !!existingPerson;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const compressedDataUrl = await compressImage(file);
+        setPhotoUrl(compressedDataUrl);
+      } catch (error) {
+        console.error("Error compressing image:", error);
+        alert('Failed to process image. Please try another file.');
+      }
+    }
+  };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,9 +139,19 @@ const AddPersonForm: React.FC<AddPersonFormProps> = ({ onSave, onClose, existing
         <label htmlFor="relationship" className="block text-sm font-medium text-slate-700">{t('formRelationshipLabel')}</label>
         <input type="text" id="relationship" value={relationship} onChange={(e) => setRelationship(e.target.value)} required className={formInputStyle} />
       </div>
-      <div>
+       <div>
         <label htmlFor="photoUrl" className="block text-sm font-medium text-slate-700">{t('formPhotoUrlLabel')}</label>
-        <input type="url" id="photoUrl" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://i.pravatar.cc/150" className={formInputStyle} />
+        <div className="flex items-center space-x-2 mt-1">
+          <input type="url" id="photoUrl" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://..." className={`${formInputStyle} mt-0 flex-1`} />
+          <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>{t('formUploadButton')}</Button>
+        </div>
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+        {photoUrl && photoUrl.startsWith('data:image') && (
+            <div className="mt-4">
+                <span className="block text-sm font-medium text-slate-700">Preview:</span>
+                <img src={photoUrl} alt="Preview" className="mt-2 w-24 h-24 rounded-full object-cover shadow-sm"/>
+            </div>
+        )}
       </div>
       <div>
         <label htmlFor="keyInfo" className="block text-sm font-medium text-slate-700">{t('formKeyInfoLabel')}</label>
