@@ -6,6 +6,7 @@ export interface Person {
   relationship: string;
   photoUrl: string; // URL to an image
   keyInfo: string;
+  keyInfoSummary?: string; // AI-generated summary for quick recall
   voiceNoteUrl?: string; // Optional: URL to a pre-recorded voice note
 }
 
