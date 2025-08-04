@@ -6,17 +6,7 @@ import Button from '../components/common/Button';
 import { Cog6ToothIcon, PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowUpTrayIcon } from '../constants';
 import NotificationBanner from '../components/common/NotificationBanner';
 import Modal from '../components/common/Modal';
-
-const LOCAL_STORAGE_KEYS = [
-  'memorycare_people', 
-  'memorycare_journalEntries', 
-  'memorycare_activities',
-  'memorycare_homeLocation',
-  'memorycare_saved_locations',
-  'memorycare_family_emails',
-  'theme',
-  'language'
-];
+import * as db from '../services/db';
 
 const SettingsPage: React.FC = () => {
     const { t } = useTranslation();
@@ -25,7 +15,7 @@ const SettingsPage: React.FC = () => {
     const [newEmail, setNewEmail] = useState('');
     const [notification, setNotification] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-    const [importedData, setImportedData] = useState<any | null>(null);
+    const [importedData, setImportedData] = useState<Record<string, any> | null>(null);
     const importFileRef = useRef<HTMLInputElement>(null);
 
 
@@ -52,26 +42,19 @@ const SettingsPage: React.FC = () => {
         }
     };
     
-    const handleExportData = () => {
-        const exportData: { [key: string]: any } = {};
-        LOCAL_STORAGE_KEYS.forEach(key => {
-            const value = localStorage.getItem(key);
-            if (value !== null) {
-                try {
-                    exportData[key] = JSON.parse(value);
-                } catch(e) {
-                    console.error(`Could not parse localStorage key "${key}" during export. Storing as is.`, e);
-                    exportData[key] = value;
-                }
-            }
-        });
-        
-        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(exportData, null, 2))}`;
-        const link = document.createElement("a");
-        link.href = jsonString;
-        const date = new Date().toISOString().split('T')[0];
-        link.download = `memorycare_backup_${date}.json`;
-        link.click();
+    const handleExportData = async () => {
+        try {
+            const exportData = await db.getAllDataForExport();
+            const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(exportData, null, 2))}`;
+            const link = document.createElement("a");
+            link.href = jsonString;
+            const date = new Date().toISOString().split('T')[0];
+            link.download = `memorycare_backup_${date}.json`;
+            link.click();
+        } catch(error) {
+            console.error("Export failed:", error);
+            setNotification({ message: 'Export failed. Could not retrieve data from the database.', type: 'error' });
+        }
     };
     
     const handleImportClick = () => {
@@ -89,8 +72,8 @@ const SettingsPage: React.FC = () => {
                 if (typeof text !== 'string') throw new Error("File content is not readable text.");
                 
                 const data = JSON.parse(text);
-                // Simple validation: check if at least one of our keys exists.
-                if (Object.keys(data).some(key => LOCAL_STORAGE_KEYS.includes(key))) {
+                // Simple validation: check if it's a non-null object.
+                if (data && typeof data === 'object' && !Array.isArray(data)) {
                     setImportedData(data);
                     setIsImportModalOpen(true);
                 } else {
@@ -108,70 +91,25 @@ const SettingsPage: React.FC = () => {
         event.target.value = ''; // Reset file input
     };
 
-    const handleConfirmOverwrite = () => {
+    const performImport = async (mode: 'merge' | 'overwrite') => {
         if (!importedData) return;
 
-        Object.keys(importedData).forEach(key => {
-            if (LOCAL_STORAGE_KEYS.includes(key)) {
-                localStorage.setItem(key, JSON.stringify(importedData[key]));
-            }
-        });
+        try {
+            await db.importData(importedData, mode);
 
-        setIsImportModalOpen(false);
-        setImportedData(null);
-        setNotification({ message: t('importSuccessOverwrite'), type: 'success' });
+            setIsImportModalOpen(false);
+            setImportedData(null);
+            const message = mode === 'overwrite' ? t('importSuccessOverwrite') : t('importSuccessMerge');
+            setNotification({ message, type: 'success' });
 
-        // Reload the page to apply all settings from localStorage
-        setTimeout(() => {
-            window.location.reload();
-        }, 2000);
-    };
-
-    const handleConfirmMerge = () => {
-        if (!importedData) return;
-
-        LOCAL_STORAGE_KEYS.forEach(key => {
-            const importedValue = importedData[key];
-            if (importedValue === undefined) {
-                return; // Key not in backup, skip
-            }
-
-            const currentValueJSON = localStorage.getItem(key);
-            
-            const arrayMergeKeys = ['memorycare_people', 'memorycare_journalEntries', 'memorycare_activities', 'memorycare_saved_locations'];
-            const stringArrayMergeKeys = ['memorycare_family_emails'];
-
-            if (arrayMergeKeys.includes(key)) {
-                const currentValue = currentValueJSON ? JSON.parse(currentValueJSON) : [];
-                if (!Array.isArray(currentValue) || !Array.isArray(importedValue)) {
-                    localStorage.setItem(key, JSON.stringify(importedValue)); // Overwrite if types are unexpected
-                    return;
-                }
-                const mergedMap = new Map();
-                currentValue.forEach(item => item?.id && mergedMap.set(item.id, item));
-                importedValue.forEach(item => item?.id && mergedMap.set(item.id, item));
-                localStorage.setItem(key, JSON.stringify(Array.from(mergedMap.values())));
-            } else if (stringArrayMergeKeys.includes(key)) {
-                const currentValue = currentValueJSON ? JSON.parse(currentValueJSON) : [];
-                if (!Array.isArray(currentValue) || !Array.isArray(importedValue)) {
-                    localStorage.setItem(key, JSON.stringify(importedValue)); // Overwrite if types are unexpected
-                    return;
-                }
-                const mergedSet = new Set([...currentValue, ...importedValue]);
-                localStorage.setItem(key, JSON.stringify(Array.from(mergedSet)));
-            } else {
-                // For simple values (theme, language, homeLocation), imported value overwrites
-                localStorage.setItem(key, JSON.stringify(importedValue));
-            }
-        });
-
-        setIsImportModalOpen(false);
-        setImportedData(null);
-        setNotification({ message: t('importSuccessMerge'), type: 'success' });
-
-        setTimeout(() => {
-            window.location.reload();
-        }, 2000);
+            // Reload the page to apply all settings from the database
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } catch (error) {
+            console.error("Import failed:", error);
+            setNotification({ message: 'Import failed. Could not write data to the database.', type: 'error' });
+        }
     };
 
 
@@ -245,10 +183,10 @@ const SettingsPage: React.FC = () => {
                         <Button variant="secondary" size="md" onClick={() => setIsImportModalOpen(false)}>
                             {t('formCancelButton')}
                         </Button>
-                        <Button variant="primary" size="md" onClick={handleConfirmMerge}>
+                        <Button variant="primary" size="md" onClick={() => performImport('merge')}>
                             {t('mergeDataButton')}
                         </Button>
-                        <Button variant="danger" size="md" onClick={handleConfirmOverwrite}>
+                        <Button variant="danger" size="md" onClick={() => performImport('overwrite')}>
                             {t('overwriteDataButton')}
                         </Button>
                     </div>
