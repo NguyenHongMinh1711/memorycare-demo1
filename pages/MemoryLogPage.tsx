@@ -9,7 +9,7 @@ import useTextToSpeech from '../hooks/useTextToSpeech';
 import PageHeader from '../components/common/PageHeader';
 import NotificationBanner from '../components/common/NotificationBanner';
 import { useTranslation } from '../contexts';
-import { generateTagsForJournal } from '../services/geminiService';
+import { generateTagsForJournal, generatePersonSummary } from '../services/geminiService';
 import AIAssistant from '../components/AIAssistant';
 
 const compressImage = (file: File, maxSize: number = 400): Promise<string> => {
@@ -59,6 +59,12 @@ const compressImage = (file: File, maxSize: number = 400): Promise<string> => {
 
 const PersonCard: React.FC<{ person: Person; onDelete: (id: string) => void; onSpeak: (text: string) => void; onEdit: (person: Person) => void; }> = ({ person, onDelete, onSpeak, onEdit }) => {
   const { t } = useTranslation();
+  
+  const handleRecall = () => {
+    const recallText = person.keyInfoSummary || t('personRecallSpeech', person.name, person.relationship, person.keyInfo);
+    onSpeak(recallText);
+  };
+  
   return (
     <div className="bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col sm:flex-row items-center sm:space-x-6 space-y-4 sm:space-y-0">
       <img src={person.photoUrl || `https://i.pravatar.cc/150?u=${person.id}`} alt={person.name} className="w-28 h-28 rounded-full object-cover border-4 border-indigo-100" />
@@ -73,7 +79,7 @@ const PersonCard: React.FC<{ person: Person; onDelete: (id: string) => void; onS
         )}
       </div>
       <div className="flex space-x-2 sm:flex-col sm:space-x-0 sm:space-y-2">
-        <Button onClick={() => onSpeak(t('personRecallSpeech', person.name, person.relationship, person.keyInfo))} variant="ghost" size="sm" leftIcon={<SpeakerWaveIcon className="w-5 h-5"/>} aria-label={t('recallButton')}>
+        <Button onClick={handleRecall} variant="ghost" size="sm" leftIcon={<SpeakerWaveIcon className="w-5 h-5"/>} aria-label={t('recallButton')}>
           <span className="hidden sm:inline">{t('recallButton')}</span>
         </Button>
          <Button onClick={() => onEdit(person)} variant="secondary" size="sm" leftIcon={<PencilIcon className="w-5 h-5"/>} aria-label={t('editButton')}>
@@ -88,12 +94,13 @@ const PersonCard: React.FC<{ person: Person; onDelete: (id: string) => void; onS
 };
 
 interface AddPersonFormProps {
-    onSave: (person: Omit<Person, 'id'> & { id?: string }) => void;
+    onSave: (person: Omit<Person, 'id' | 'keyInfoSummary'> & { id?: string }) => void;
     onClose: () => void;
     existingPerson: Person | null;
+    isSaving?: boolean;
 }
 
-const AddPersonForm: React.FC<AddPersonFormProps> = ({ onSave, onClose, existingPerson }) => {
+const AddPersonForm: React.FC<AddPersonFormProps> = ({ onSave, onClose, existingPerson, isSaving = false }) => {
   const [name, setName] = useState(existingPerson?.name || '');
   const [relationship, setRelationship] = useState(existingPerson?.relationship || '');
   const [photoUrl, setPhotoUrl] = useState(existingPerson?.photoUrl || '');
@@ -118,32 +125,31 @@ const AddPersonForm: React.FC<AddPersonFormProps> = ({ onSave, onClose, existing
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !relationship) {
-        alert(t('formRequiredAlert'));
+    if (isSaving || !name || !relationship) {
+        if (!name || !relationship) alert(t('formRequiredAlert'));
         return;
     }
     onSave({ id: existingPerson?.id, name, relationship, photoUrl, keyInfo });
-    onClose();
   };
   
-  const formInputStyle = "mt-1 block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base text-slate-900 placeholder:text-slate-400";
+  const formInputStyle = "mt-1 block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base text-slate-900 placeholder:text-slate-400 disabled:opacity-70 disabled:cursor-not-allowed";
 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-slate-700">{t('formNameLabel')}</label>
-        <input type="text" id="name" value={name} onChange={(e) => setName(e.target.value)} required className={formInputStyle} />
+        <input type="text" id="name" value={name} onChange={(e) => setName(e.target.value)} required className={formInputStyle} disabled={isSaving}/>
       </div>
       <div>
         <label htmlFor="relationship" className="block text-sm font-medium text-slate-700">{t('formRelationshipLabel')}</label>
-        <input type="text" id="relationship" value={relationship} onChange={(e) => setRelationship(e.target.value)} required className={formInputStyle} />
+        <input type="text" id="relationship" value={relationship} onChange={(e) => setRelationship(e.target.value)} required className={formInputStyle} disabled={isSaving}/>
       </div>
        <div>
         <label htmlFor="photoUrl" className="block text-sm font-medium text-slate-700">{t('formPhotoUrlLabel')}</label>
         <div className="flex items-center space-x-2 mt-1">
-          <input type="url" id="photoUrl" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://..." className={`${formInputStyle} mt-0 flex-1`} />
-          <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>{t('formUploadButton')}</Button>
+          <input type="url" id="photoUrl" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://..." className={`${formInputStyle} mt-0 flex-1`} disabled={isSaving}/>
+          <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>{t('formUploadButton')}</Button>
         </div>
         <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
         {photoUrl && photoUrl.startsWith('data:image') && (
@@ -155,11 +161,11 @@ const AddPersonForm: React.FC<AddPersonFormProps> = ({ onSave, onClose, existing
       </div>
       <div>
         <label htmlFor="keyInfo" className="block text-sm font-medium text-slate-700">{t('formKeyInfoLabel')}</label>
-        <textarea id="keyInfo" value={keyInfo} onChange={(e) => setKeyInfo(e.target.value)} rows={3} className={formInputStyle}></textarea>
+        <textarea id="keyInfo" value={keyInfo} onChange={(e) => setKeyInfo(e.target.value)} rows={3} className={formInputStyle} disabled={isSaving}></textarea>
       </div>
       <div className="flex justify-end space-x-3 pt-4">
-        <Button type="button" variant="secondary" onClick={onClose} size="md">{t('formCancelButton')}</Button>
-        <Button type="submit" variant="primary" size="md">{isEditMode ? t('formUpdateButton') : t('formAddButton')}</Button>
+        <Button type="button" variant="secondary" onClick={onClose} size="md" disabled={isSaving}>{t('formCancelButton')}</Button>
+        <Button type="submit" variant="primary" size="md" isLoading={isSaving}>{isEditMode ? t('formUpdateButton') : t('formAddButton')}</Button>
       </div>
     </form>
   );
@@ -174,6 +180,7 @@ const MemoryLogPage: React.FC = () => {
   
   const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
+  const [isSavingPerson, setIsSavingPerson] = useState(false);
 
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
   const [journalText, setJournalText] = useState('');
@@ -195,16 +202,34 @@ const MemoryLogPage: React.FC = () => {
     setEditingPerson(null);
   };
 
-  const handleSavePerson = (personData: Omit<Person, 'id'> & { id?: string }) => {
-    const isEditing = !!personData.id;
-    if (isEditing) {
-        const updatedPerson = { ...personData, id: personData.id! };
-        setPeople(prev => prev.map(p => p.id === updatedPerson.id ? updatedPerson : p));
-        setNotification({ message: t('personUpdatedSuccess', updatedPerson.name), type: 'success'});
-    } else {
-        const newPerson: Person = { ...personData, id: Date.now().toString() };
-        setPeople((prev) => [...prev, newPerson]);
-        setNotification({ message: t('personAddedSuccess', newPerson.name), type: 'success'});
+  const handleSavePerson = async (personData: Omit<Person, 'id' | 'keyInfoSummary'> & { id?: string }) => {
+    setIsSavingPerson(true);
+    setNotification(null);
+    try {
+        const summary = await generatePersonSummary({
+            name: personData.name,
+            relationship: personData.relationship,
+            keyInfo: personData.keyInfo,
+        }, language);
+
+        const personWithSummary = { ...personData, keyInfoSummary: summary };
+
+        const isEditing = !!personData.id;
+        if (isEditing) {
+            const updatedPerson = { ...personWithSummary, id: personData.id! };
+            setPeople(prev => prev.map(p => p.id === updatedPerson.id ? updatedPerson : p));
+            setNotification({ message: t('personUpdatedSuccess', updatedPerson.name), type: 'success'});
+        } else {
+            const newPerson: Person = { ...personWithSummary, id: Date.now().toString() };
+            setPeople((prev) => [...prev, newPerson]);
+            setNotification({ message: t('personAddedSuccess', newPerson.name), type: 'success'});
+        }
+        handleClosePersonModal();
+    } catch (error) {
+        console.error("Failed to save person with AI summary:", error);
+        setNotification({ message: 'Error saving person details. Please try again.', type: 'error' });
+    } finally {
+        setIsSavingPerson(false);
     }
   };
 
@@ -244,21 +269,21 @@ const MemoryLogPage: React.FC = () => {
   };
   
   const handleSpeak = useCallback((textToSpeak: string) => {
-    if (ttsSupported) {
+    if (ttsSupported && textToSpeak) {
       speak(textToSpeak, {
         onLanguageUnavailable: () => {
             setNotification({ message: t('ttsLanguageUnavailableError'), type: 'error'});
         }
       });
-    } else {
+    } else if (!ttsSupported) {
       setNotification({ message: t('ttsNotSupportedError'), type: 'error'});
     }
-  }, [ttsSupported, speak, t, setNotification]);
+  }, [ttsSupported, speak, setNotification, t]);
 
 
   const aiSystemInstruction = useMemo(() => {
     const peopleContext = people.length > 0 
-        ? `Here is a list of important people: ${JSON.stringify(people.map(p => ({name: p.name, relationship: p.relationship, keyInfo: p.keyInfo})))}. Answer questions about them based only on this information.`
+        ? `Here is a list of important people: ${JSON.stringify(people.map(p => ({name: p.name, relationship: p.relationship, keyInfo: p.keyInfoSummary || p.keyInfo})))}. Answer questions about them based only on this information.`
         : "There are no people saved in the memory log yet.";
     return `You are a friendly and patient assistant for a person with memory care needs. Your primary role is to help them recall information about people they know. ${peopleContext} If asked about someone not on the list, say you don't have information about them. Keep your answers simple, clear, and comforting.`;
   }, [people]);
@@ -352,7 +377,7 @@ const MemoryLogPage: React.FC = () => {
       </section>
 
       <Modal isOpen={isPersonModalOpen} onClose={handleClosePersonModal} title={editingPerson ? t('modalEditPersonTitle', editingPerson.name) : t('modalAddPersonTitle')}>
-        <AddPersonForm onSave={handleSavePerson} onClose={handleClosePersonModal} existingPerson={editingPerson} />
+        <AddPersonForm onSave={handleSavePerson} onClose={handleClosePersonModal} existingPerson={editingPerson} isSaving={isSavingPerson} />
       </Modal>
 
       <AIAssistant systemInstruction={aiSystemInstruction} />

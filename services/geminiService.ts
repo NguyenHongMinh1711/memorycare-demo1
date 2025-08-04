@@ -170,3 +170,34 @@ export const generateMyStoryQuestion = async (previousQuestions: string[], langu
         return `Error getting a new question: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
 };
+
+export const generatePersonSummary = async (
+    personInfo: { name: string, relationship: string, keyInfo: string },
+    language: 'en' | 'vi' = 'en'
+): Promise<string> => {
+    if (!API_KEY) return personInfo.keyInfo;
+    
+    const { name, relationship, keyInfo } = personInfo;
+    if (!keyInfo.trim()) return ''; // Don't generate summary for empty info.
+    
+    const languageName = language === 'vi' ? 'Vietnamese' : 'English';
+    const exampleText = language === 'vi' 
+        ? 'Ví dụ: "Đây là con trai của bạn, Minh. Anh ấy rất thích làm vườn và thường mang cho bạn hoa tươi từ vườn của anh ấy."'
+        : 'For example: "This is your son, Minh. He loves gardening and often brings you fresh flowers from his garden."';
+
+    const systemInstruction = `You are an assistant who creates very short, natural-sounding summaries in ${languageName}. The summary should be easy to understand for someone with memory difficulties. It should be presented as a simple statement about the person, written from the perspective of someone talking to the user (e.g., "This is **your** son..."). Do not use markdown or any special formatting. Just return the plain text sentence.`;
+    
+    const prompt = `Create a 1-3 sentence summary for this person. Their name is ${name}, their relationship to the user is "${relationship}", and here is some key information about them: "${keyInfo}". The summary should be a simple, friendly reminder. ${exampleText}`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: GEMINI_TEXT_MODEL,
+            contents: prompt,
+            config: { systemInstruction }
+        });
+        return response.text?.trim() || keyInfo;
+    } catch (error) {
+        console.error("Error generating person summary with Gemini:", error);
+        return keyInfo; 
+    }
+};
