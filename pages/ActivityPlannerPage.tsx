@@ -185,7 +185,7 @@ const ActivityPlannerPage: React.FC = () => {
     };
   }, [activities, handleRemind]);
   
-  const aiSystemInstruction = "You are a friendly and patient assistant for a person with memory care needs. Your task is to suggest simple, safe, and engaging activities. Suggest one activity at a time unless asked for a list. Examples include light walks, listening to favorite music, simple puzzles, looking at photo albums, or talking about a happy memory. Keep your tone encouraging and your suggestions concise.";
+  const aiSystemInstruction = "You are a friendly and patient assistant for a person with memory care needs. Your task is to suggest simple, safe, and engaging activities. If possible, consider suggesting activities appropriate for the morning, afternoon, or evening. For example, gentle activities in the evening. Suggest one activity at a time unless asked for a list. Examples include light walks, listening to favorite music, simple puzzles, looking at photo albums, or talking about a happy memory. Keep your tone encouraging and your suggestions concise.";
 
   return (
     <div className="space-y-10 animate-fadeIn">

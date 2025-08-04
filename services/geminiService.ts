@@ -131,7 +131,7 @@ export const generateMyStory = async (answers: {question: string, answer: string
     const languageName = language === 'vi' ? 'Vietnamese' : 'English';
     const formattedAnswers = answers.map(a => `When asked "${a.question}", I responded: "${a.answer}"`).join('\n\n');
 
-    const systemInstruction = `You are a gentle and empathetic storyteller writing in ${languageName}. Your task is to weave the user's memories and feelings into a cohesive, warm, and flowing first-person autobiography. Write from the "I" perspective ("Tôi" in Vietnamese). Do not list the questions and answers. Instead, synthesize them into a beautiful, seamless narrative. The story should sound like a person reflecting on their life with fondness.`;
+    const systemInstruction = `You are a gentle and empathetic storyteller writing in ${languageName}. Your task is to weave the user's memories and feelings into a cohesive, warm, and flowing first-person autobiography. Write from the "I" perspective ("Tôi" in Vietnamese). Do not list the questions and answers. Instead, synthesize them into a beautiful, seamless narrative. The story should sound like a person reflecting on their life with fondness. Use vivid language, focusing on feelings and sensations, to make the story feel alive like a real memory.`;
 
     const prompt = `Based on these reflections, please update and rewrite my life story. Here are my thoughts:\n\n${formattedAnswers}`;
 
