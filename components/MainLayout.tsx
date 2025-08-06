@@ -8,7 +8,6 @@ import SettingsPage from '../pages/FamilySettingsPage';
 import MyStoryPage from '../pages/MyStoryPage'; // Import the new page
 import { HomeIcon, BookOpenIcon, CalendarIcon, MapPinIcon, Cog6ToothIcon, PencilIcon } from '../constants';
 import { useTranslation } from '../contexts';
-import NotificationPermissionBanner from './NotificationPermissionBanner';
 
 const MainLayout: React.FC = () => {
   const location = useLocation();
@@ -66,7 +65,6 @@ const MainLayout: React.FC = () => {
         </nav>
 
         <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto pb-24 md:pb-8">
-          <NotificationPermissionBanner />
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/memory-log" element={<MemoryLogPage />} />
