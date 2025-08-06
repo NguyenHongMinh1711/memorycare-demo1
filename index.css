@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Default focus styles for accessibility */
+  *:focus-visible {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  input:focus-visible, textarea:focus-visible, select:focus-visible {
+     outline: none;
+  }
+}
+
+@layer utilities {
+    /* Set height for sticky sidebar on desktop, accounting for header */
+    .h-screen-minus-header {
+      height: calc(100vh - 72px); /* Adjust 72px to match your header's height */
+    }
+}
