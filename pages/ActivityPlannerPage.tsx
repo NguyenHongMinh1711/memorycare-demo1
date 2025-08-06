@@ -143,15 +143,18 @@ const ActivityPlannerPage: React.FC = () => {
     if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistration().then(registration => {
             if (registration) {
+                const notificationTitle = t('pushNotificationTitle', activity.name);
+                const notificationBody = activity.description || t('pushNotificationBody', activity.time);
+
                 const options: NotificationOptions = {
-                    body: activity.description || `Scheduled for ${activity.time}`,
+                    body: notificationBody,
                     icon: '/icon-192x192.png', // Optional: Add an icon to your public folder
                     data: {
                         url: window.location.origin + '/#/activity-planner'
                     },
                     tag: activity.id // Use activity ID as tag to prevent duplicate notifications for the same reminder
                 };
-                registration.showNotification(`Reminder: ${activity.name}`, options);
+                registration.showNotification(notificationTitle, options);
             }
         });
     }
