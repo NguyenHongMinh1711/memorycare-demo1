@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { InformationCircleIcon } from '../constants';
 import Button from './common/Button';
+import { useTranslation } from '../contexts';
 
 const NotificationPermissionBanner: React.FC = () => {
+    const { t } = useTranslation();
     const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>('default');
     const [isVisible, setIsVisible] = useState(false);
 
@@ -36,16 +38,16 @@ const NotificationPermissionBanner: React.FC = () => {
             <div className="flex items-start sm:items-center">
                 <InformationCircleIcon className="w-6 h-6 mr-3 flex-shrink-0" />
                 <div>
-                    <p className="font-bold">Enable Notifications</p>
-                    <p className="text-sm">Get timely reminders for your scheduled activities, even when the app is in the background.</p>
+                    <p className="font-bold">{t('notificationPermissionBannerTitle')}</p>
+                    <p className="text-sm">{t('notificationPermissionBannerBody')}</p>
                 </div>
             </div>
             <div className="flex space-x-3 self-end sm:self-center flex-shrink-0">
                 <Button onClick={handleRequestPermission} variant="primary" size="sm">
-                    Enable
+                    {t('enableButton')}
                 </Button>
                 <Button onClick={handleDismiss} variant="secondary" size="sm">
-                    Not Now
+                    {t('notNowButton')}
                 </Button>
             </div>
         </div>
