@@ -14,6 +14,7 @@ import PageHeader from '../components/common/PageHeader';
 import NotificationBanner from '../components/common/NotificationBanner';
 import Modal from '../components/common/Modal';
 import { useTranslation } from '../contexts';
+import LocationPermissionBanner from '../components/LocationPermissionBanner';
 
 const GOONG_API_KEY = process.env.GOONG_API_KEY;
 const GOONG_MAPTILES_KEY = process.env.GOONG_MAPTILES_KEY;
@@ -21,7 +22,9 @@ const GOONG_MAPTILES_KEY = process.env.GOONG_MAPTILES_KEY;
 const LocationServicesPage: React.FC = () => {
   const { t } = useTranslation();
 
-  // State and Refs for location and notifications
+  // Permissions and location state
+  const [permissionStatus, setPermissionStatus] = useState<PermissionState>('prompt');
+  const [showPermissionBanner, setShowPermissionBanner] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<LocationInfo | null>(null);
   const [homeLocation, setHomeLocation] = useLocalStorage<LocationInfo | null>('memorycare_homeLocation', null);
   const [savedLocations, setSavedLocations] = useLocalStorage<SavedLocation[]>('memorycare_saved_locations', []);
@@ -47,34 +50,25 @@ const LocationServicesPage: React.FC = () => {
   // --- Map and Location Logic ---
 
   useEffect(() => {
-    if (!GOONG_API_KEY || !GOONG_MAPTILES_KEY) {
-      setError(t('mapApiKeyError'));
-      return;
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'geolocation' }).then(status => {
+        setPermissionStatus(status.state);
+        status.onchange = () => {
+          setPermissionStatus(status.state);
+        };
+      }).catch(() => {
+        setPermissionStatus('prompt');
+      });
+    } else {
+      setIsLoadingLocation(false);
+      setShowPermissionBanner(true); 
     }
-    
-    if (mapRef.current && !mapInstance.current) {
-        goongJs.accessToken = GOONG_MAPTILES_KEY;
-        mapInstance.current = new goongJs.Map({
-            container: mapRef.current,
-            style: 'https://tiles.goong.io/assets/goong_map_web.json',
-            center: [105.8342, 21.0278], // Default to Hanoi
-            zoom: 12,
-        });
-    }
+  }, []);
 
-    // Cleanup map instance on component unmount
-    return () => {
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
-      }
-    }
-  }, [t]);
-
-  // Fetch Current Location
   const handleFetchLocation = useCallback(() => {
     setIsLoadingLocation(true);
     setError(null);
+    setShowPermissionBanner(false);
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const loc: LocationInfo = { latitude: position.coords.latitude, longitude: position.coords.longitude };
@@ -94,12 +88,43 @@ const LocationServicesPage: React.FC = () => {
     );
   }, [t]);
 
-  // Initial location fetch
   useEffect(() => {
-    handleFetchLocation();
-  }, [handleFetchLocation]);
-  
-  // Update map when location changes
+    if (permissionStatus === 'granted') {
+      handleFetchLocation();
+      setShowPermissionBanner(false);
+    } else if (permissionStatus === 'prompt') {
+      setIsLoadingLocation(false);
+      setShowPermissionBanner(true);
+    } else { // 'denied'
+      setIsLoadingLocation(false);
+      setShowPermissionBanner(false);
+    }
+  }, [permissionStatus, handleFetchLocation]);
+
+  useEffect(() => {
+    if (!GOONG_API_KEY || !GOONG_MAPTILES_KEY) {
+      setError(t('mapApiKeyError'));
+      return;
+    }
+    
+    if (mapRef.current && !mapInstance.current && currentLocation) {
+        goongJs.accessToken = GOONG_MAPTILES_KEY;
+        mapInstance.current = new goongJs.Map({
+            container: mapRef.current,
+            style: 'https://tiles.goong.io/assets/goong_map_web.json',
+            center: [currentLocation.longitude, currentLocation.latitude],
+            zoom: 12,
+        });
+    }
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    }
+  }, [t, currentLocation]);
+
   useEffect(() => {
     if (mapInstance.current && currentLocation) {
       const userPos: [number, number] = [currentLocation.longitude, currentLocation.latitude];
@@ -204,6 +229,11 @@ const LocationServicesPage: React.FC = () => {
   }, [removeRouteFromMap, speak, t, ttsSupported]);
 
   // --- User Actions ---
+  const handleRequestPermission = () => {
+    setShowPermissionBanner(false);
+    handleFetchLocation();
+  };
+
   const handleOpenSaveModal = (locationToEdit: SavedLocation | null) => {
     setEditingLocation(locationToEdit);
     setNewLocationName(locationToEdit ? locationToEdit.name : '');
@@ -304,15 +334,50 @@ const LocationServicesPage: React.FC = () => {
       {notification && <NotificationBanner message={notification.message} type={notification.type} onDismiss={() => setNotification(null)} />}
       {error && <NotificationBanner message={error} type="error" onDismiss={() => setError(null)} duration={0} />}
       {ttsError && <NotificationBanner message={`Text-to-speech error: ${ttsError}`} type="error" onDismiss={() => {}} />}
+
+      {showPermissionBanner && permissionStatus === 'prompt' && (
+        <LocationPermissionBanner
+            onRequestPermission={handleRequestPermission}
+            onDismiss={() => setShowPermissionBanner(false)}
+        />
+      )}
+
+      {permissionStatus === 'denied' && (
+         <div className="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-r-lg mb-6 flex items-start gap-3" role="alert">
+            <MapPinIcon className="w-6 h-6 mr-3 flex-shrink-0" />
+            <div>
+              <p className="font-bold">{t('locationPermissionDeniedTitle')}</p>
+              <p className="text-sm">{t('locationPermissionDeniedBody')}</p>
+            </div>
+         </div>
+      )}
       
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div ref={mapRef} className="w-full h-64 md:h-96 bg-slate-200 flex items-center justify-center text-slate-500" role="application" aria-label="Interactive Map">
-            {isLoadingLocation && !error && <span>{t('findingLocation')}</span>}
-            {error && <span className="p-4 text-center">{error}</span>}
+            {isLoadingLocation && (
+                <div className="text-center p-4">
+                  <svg className="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <p className="mt-2 text-slate-600">{t('findingLocation')}</p>
+                </div>
+            )}
+            {!currentLocation && !isLoadingLocation && (
+              <div className="text-center p-4">
+                <MapPinIcon className="w-16 h-16 mx-auto text-slate-300" />
+                <p className="mt-2 text-slate-600">
+                  {permissionStatus === 'denied'
+                    ? t('locationRequiredForMap')
+                    : t('enableLocationToBegin')
+                  }
+                </p>
+              </div>
+            )}
         </div>
          <div className="p-4 md:p-6">
             <h3 className="text-lg font-bold text-slate-800">{t('currentLocationTitle')}</h3>
-            {isLoadingLocation && <p className="text-slate-500">{t('findingLocation')}</p>}
+            {isLoadingLocation && !currentLocation && <p className="text-slate-500">{t('findingLocation')}</p>}
             {currentLocation && (
               <div className="text-sm text-slate-700 font-mono">
                 <span>{t('latitude')}: {currentLocation.latitude.toFixed(5)}</span>
