@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MemoryCare</title>
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/maskable-icon-512x512.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/maskable-icon-512x512.png">
+  <link rel="shortcut icon" href="/maskable-icon-512x512.png">
+
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="apple-touch-icon" href="/maskable-icon-512x512.png">
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -67,5 +75,18 @@
 <body class="bg-slate-100">
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          })
+          .catch(error => {
+            console.log('ServiceWorker registration failed: ', error);
+          });
+      });
+    }
+  </script>
 </body>
 </html>

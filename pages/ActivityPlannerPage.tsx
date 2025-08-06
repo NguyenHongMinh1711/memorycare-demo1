@@ -9,6 +9,7 @@ import PageHeader from '../components/common/PageHeader';
 import NotificationBanner from '../components/common/NotificationBanner';
 import { useTranslation } from '../contexts';
 import AIAssistant from '../components/AIAssistant';
+import NotificationPermissionBanner from '../components/NotificationPermissionBanner';
 
 interface AddActivityFormProps {
     onSave: (activity: Omit<Activity, 'id'> & { id?: string }) => void;
@@ -126,14 +127,34 @@ const ActivityPlannerPage: React.FC = () => {
   const handleRemind = useCallback((activity: Activity) => {
     const reminderText = t('activityReminderSpeech', activity.name, activity.time, activity.description || '');
     
-    // Show the reminder text in the notification banner.
-    setNotification({ message: reminderText, type: 'info' });
+    // Show the reminder text in the in-app notification banner.
+    setNotification({ message: t('remindSentInfo', activity.name), type: 'info' });
 
+    // Trigger Text-to-Speech if available
     if (ttsSupported) {
         speak(reminderText, {
             onLanguageUnavailable: () => {
-                // This will replace the info banner with an error, which is acceptable.
                 setNotification({ message: t('ttsLanguageUnavailableError'), type: 'error' });
+            }
+        });
+    }
+
+    // Trigger System Notification if permission is granted
+    if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(registration => {
+            if (registration) {
+                const notificationTitle = t('pushNotificationTitle', activity.name);
+                const notificationBody = activity.description || t('pushNotificationBody', activity.time);
+
+                const options: NotificationOptions = {
+                    body: notificationBody,
+                    icon: '/icon-192x192.png', // Optional: Add an icon to your public folder
+                    data: {
+                        url: window.location.origin + '/#/activity-planner'
+                    },
+                    tag: activity.id // Use activity ID as tag to prevent duplicate notifications for the same reminder
+                };
+                registration.showNotification(notificationTitle, options);
             }
         });
     }
@@ -194,6 +215,7 @@ const ActivityPlannerPage: React.FC = () => {
     <div className="space-y-10 animate-fadeIn">
       <PageHeader title={t('pageTitlePlanner')} subtitle={t('pageSubtitlePlanner')} icon={<CalendarIcon className="w-10 h-10" />} />
       
+      <NotificationPermissionBanner />
       {notification && <NotificationBanner message={notification.message} type={notification.type} onDismiss={() => setNotification(null)} />}
       {ttsError && <NotificationBanner message={`Text-to-speech error: ${ttsError}`} type="error" onDismiss={() => {}} />}
 

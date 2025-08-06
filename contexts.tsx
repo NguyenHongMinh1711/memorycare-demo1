@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import useLocalStorage from './hooks/useLocalStorage';
 
@@ -127,6 +128,8 @@ const translations = {
     remindSentInfo: 'Reminder for "{name}" sent.',
     ttsAlertMessage: "Text-to-speech not supported. Showing alert instead.",
     activityReminderSpeech: "Reminder: It's time for {name} at {time}. {description}",
+    pushNotificationTitle: "Reminder: {name}",
+    pushNotificationBody: "Scheduled for {time}",
     addActivityButton: "Add Activity",
     noActivitiesYet: 'No activities scheduled. Click "Add Activity" to plan your day.',
     remindButton: "Remind",
@@ -135,7 +138,7 @@ const translations = {
     formActivityNameLabel: "Activity Name",
     formTimeLabel: "Time (HH:MM)",
     formDescriptionLabel: "Description (Optional)",
-    formRecurringLabel: "Recurring Activity",
+    formRecurringLabel: "Do not notify",
     formAddActivityButton: "Add Activity",
     formUpdateActivityButton: "Update Activity",
     formTimeRequiredAlert: "Activity name and time are required.",
@@ -233,6 +236,16 @@ const translations = {
     myStoryLoadingQuestion: "Thinking of a new question for you...",
     myStoryMicrophoneButtonStart: "Record Answer",
     myStoryMicrophoneButtonStop: "Stop Recording",
+    notificationPermissionBannerTitle: "Enable Notifications",
+    notificationPermissionBannerBody: "Get timely reminders for your scheduled activities, even when the app is in the background.",
+    locationPermissionBannerTitle: "Enable Location Services",
+    locationPermissionBannerBody: "To provide navigation and map features, this app needs to access your device's location.",
+    enableButton: "Enable",
+    notNowButton: "Not Now",
+    locationPermissionDeniedTitle: "Location Access Denied",
+    locationPermissionDeniedBody: "To use map features, please enable location permissions for this site in your browser settings.",
+    locationRequiredForMap: "Location access is required for map features.",
+    enableLocationToBegin: "Please enable location to begin.",
   },
   vi: {
     headerTitle: "MemoryCare",
@@ -311,6 +324,8 @@ const translations = {
     remindSentInfo: 'Đã gửi lời nhắc về hoạt động "{name}".',
     ttsAlertMessage: "Tính năng đọc không được hỗ trợ. Sẽ hiển thị thông báo thay thế.",
     activityReminderSpeech: "Nhắc nhở: Đã đến giờ {name} lúc {time}. {description}",
+    pushNotificationTitle: "Nhắc nhở: {name}",
+    pushNotificationBody: "Lịch trình lúc {time}",
     addActivityButton: "Thêm hoạt động",
     noActivitiesYet: 'Chưa có hoạt động nào được lên lịch. Hãy bấm "Thêm hoạt động" để bắt đầu.',
     remindButton: "Nhắc nhở",
@@ -319,7 +334,7 @@ const translations = {
     formActivityNameLabel: "Tên hoạt động",
     formTimeLabel: "Thời gian (Giờ:Phút)",
     formDescriptionLabel: "Mô tả (không bắt buộc)",
-    formRecurringLabel: "Hoạt động lặp lại",
+    formRecurringLabel: "Không thông báo",
     formAddActivityButton: "Thêm",
     formUpdateActivityButton: "Cập nhật",
     formTimeRequiredAlert: "Tên hoạt động và thời gian là bắt buộc.",
@@ -417,6 +432,16 @@ const translations = {
     myStoryLoadingQuestion: "Đang nghĩ câu hỏi tiếp theo cho bạn...",
     myStoryMicrophoneButtonStart: "Ghi âm câu trả lời",
     myStoryMicrophoneButtonStop: "Dừng ghi âm",
+    notificationPermissionBannerTitle: "Bật thông báo",
+    notificationPermissionBannerBody: "Nhận lời nhắc kịp thời cho các hoạt động đã lên lịch, ngay cả khi ứng dụng chạy nền.",
+    locationPermissionBannerTitle: "Bật Dịch vụ Vị trí",
+    locationPermissionBannerBody: "Để cung cấp tính năng bản đồ và chỉ đường, ứng dụng cần truy cập vị trí thiết bị của bạn.",
+    enableButton: "Bật",
+    notNowButton: "Để sau",
+    locationPermissionDeniedTitle: "Truy cập vị trí bị từ chối",
+    locationPermissionDeniedBody: "Để sử dụng các tính năng bản đồ, vui lòng bật quyền truy cập vị trí cho trang web này trong cài đặt trình duyệt của bạn.",
+    locationRequiredForMap: "Cần truy cập vị trí để sử dụng tính năng bản đồ.",
+    enableLocationToBegin: "Vui lòng bật vị trí để bắt đầu.",
   }
 };
 
