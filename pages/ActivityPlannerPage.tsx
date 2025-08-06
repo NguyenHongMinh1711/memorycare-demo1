@@ -9,6 +9,7 @@ import PageHeader from '../components/common/PageHeader';
 import NotificationBanner from '../components/common/NotificationBanner';
 import { useTranslation } from '../contexts';
 import AIAssistant from '../components/AIAssistant';
+import NotificationPermissionBanner from '../components/NotificationPermissionBanner';
 
 interface AddActivityFormProps {
     onSave: (activity: Omit<Activity, 'id'> & { id?: string }) => void;
@@ -211,6 +212,7 @@ const ActivityPlannerPage: React.FC = () => {
     <div className="space-y-10 animate-fadeIn">
       <PageHeader title={t('pageTitlePlanner')} subtitle={t('pageSubtitlePlanner')} icon={<CalendarIcon className="w-10 h-10" />} />
       
+      <NotificationPermissionBanner />
       {notification && <NotificationBanner message={notification.message} type={notification.type} onDismiss={() => setNotification(null)} />}
       {ttsError && <NotificationBanner message={`Text-to-speech error: ${ttsError}`} type="error" onDismiss={() => {}} />}
 
