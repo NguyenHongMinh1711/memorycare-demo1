@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import useLocalStorage from './hooks/useLocalStorage';
 
@@ -233,6 +234,14 @@ const translations = {
     myStoryLoadingQuestion: "Thinking of a new question for you...",
     myStoryMicrophoneButtonStart: "Record Answer",
     myStoryMicrophoneButtonStop: "Stop Recording",
+    locationPermissionBannerTitle: "Enable Location Services",
+    locationPermissionBannerBody: "To provide navigation and map features, this app needs to access your device's location.",
+    enableButton: "Enable",
+    notNowButton: "Not Now",
+    locationPermissionDeniedTitle: "Location Access Denied",
+    locationPermissionDeniedBody: "To use map features, please enable location permissions for this site in your browser settings.",
+    locationRequiredForMap: "Location access is required for map features.",
+    enableLocationToBegin: "Please enable location to begin.",
   },
   vi: {
     headerTitle: "MemoryCare",
@@ -417,6 +426,14 @@ const translations = {
     myStoryLoadingQuestion: "Đang nghĩ câu hỏi tiếp theo cho bạn...",
     myStoryMicrophoneButtonStart: "Ghi âm câu trả lời",
     myStoryMicrophoneButtonStop: "Dừng ghi âm",
+    locationPermissionBannerTitle: "Bật Dịch vụ Vị trí",
+    locationPermissionBannerBody: "Để cung cấp tính năng bản đồ và chỉ đường, ứng dụng cần truy cập vị trí thiết bị của bạn.",
+    enableButton: "Bật",
+    notNowButton: "Để sau",
+    locationPermissionDeniedTitle: "Truy cập vị trí bị từ chối",
+    locationPermissionDeniedBody: "Để sử dụng các tính năng bản đồ, vui lòng bật quyền truy cập vị trí cho trang web này trong cài đặt trình duyệt của bạn.",
+    locationRequiredForMap: "Cần truy cập vị trí để sử dụng tính năng bản đồ.",
+    enableLocationToBegin: "Vui lòng bật vị trí để bắt đầu.",
   }
 };
 
