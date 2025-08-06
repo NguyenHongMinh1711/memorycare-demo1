@@ -12,45 +12,6 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#4f46e5">
   <link rel="apple-touch-icon" href="/maskable-icon-512x512.png">
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {},
-      },
-    }
-  </script>
-  
-  <style>
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @keyframes scaleIn {
-      from { opacity: 0; transform: scale(0.97); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    .animate-fadeIn {
-      animation: fadeIn 0.3s ease-out forwards;
-    }
-    .animate-scaleIn {
-      animation: scaleIn 0.2s ease-out forwards;
-    }
-    /* Set height for sticky sidebar on desktop, accounting for header */
-    .h-screen-minus-header {
-      height: calc(100vh - 72px); /* Adjust 72px to match your header's height */
-    }
-    /* Default focus styles for accessibility */
-    *:focus-visible {
-      outline: 2px solid #4f46e5;
-      outline-offset: 2px;
-      border-radius: 4px;
-    }
-    input:focus-visible, textarea:focus-visible, select:focus-visible {
-       outline: none;
-    }
-  </style>
 
 <script type="importmap">
 {
@@ -66,7 +27,13 @@
     "@goongmaps/goong-js": "https://esm.sh/@goongmaps/goong-js@^1.0.9",
     "@goongmaps/goong-sdk/": "https://esm.sh/@goongmaps/goong-sdk@^1.0.7/",
     "@goongmaps/goong-sdk": "https://esm.sh/@goongmaps/goong-sdk@^1.0.7",
-    "idb": "https://esm.sh/idb@8.0.0"
+    "idb": "https://esm.sh/idb@8.0.0",
+    "workbox-strategies": "https://esm.sh/workbox-strategies@^7.3.0",
+    "workbox-precaching": "https://esm.sh/workbox-precaching@^7.3.0",
+    "workbox-routing": "https://esm.sh/workbox-routing@^7.3.0",
+    "workbox-cacheable-response": "https://esm.sh/workbox-cacheable-response@^7.3.0",
+    "vite-plugin-pwa": "https://esm.sh/vite-plugin-pwa@^1.0.2",
+    "workbox-expiration": "https://esm.sh/workbox-expiration@^7.3.0"
   }
 }
 </script>
@@ -75,18 +42,5 @@
 <body class="bg-slate-100">
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-          .then(registration => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-          })
-          .catch(error => {
-            console.log('ServiceWorker registration failed: ', error);
-          });
-      });
-    }
-  </script>
 </body>
 </html>
