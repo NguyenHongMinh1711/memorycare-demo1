@@ -126,14 +126,31 @@ const ActivityPlannerPage: React.FC = () => {
   const handleRemind = useCallback((activity: Activity) => {
     const reminderText = t('activityReminderSpeech', activity.name, activity.time, activity.description || '');
     
-    // Show the reminder text in the notification banner.
-    setNotification({ message: reminderText, type: 'info' });
+    // Show the reminder text in the in-app notification banner.
+    setNotification({ message: t('remindSentInfo', activity.name), type: 'info' });
 
+    // Trigger Text-to-Speech if available
     if (ttsSupported) {
         speak(reminderText, {
             onLanguageUnavailable: () => {
-                // This will replace the info banner with an error, which is acceptable.
                 setNotification({ message: t('ttsLanguageUnavailableError'), type: 'error' });
+            }
+        });
+    }
+
+    // Trigger System Notification if permission is granted
+    if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(registration => {
+            if (registration) {
+                const options: NotificationOptions = {
+                    body: activity.description || `Scheduled for ${activity.time}`,
+                    icon: '/icon-192x192.png', // Optional: Add an icon to your public folder
+                    data: {
+                        url: window.location.origin + '/#/activity-planner'
+                    },
+                    tag: activity.id // Use activity ID as tag to prevent duplicate notifications for the same reminder
+                };
+                registration.showNotification(`Reminder: ${activity.name}`, options);
             }
         });
     }
