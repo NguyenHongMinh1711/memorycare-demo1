@@ -207,7 +207,10 @@ const LocationServicesPage: React.FC = () => {
 
     const calculateAndDisplayRoute = useCallback(async (origin: LocationInfo | null, destinationInfo: LocationInfo | string) => {
         if (!origin) { setNotification({ message: t('guideHomeError'), type: 'error' }); return; }
-        if (!GOONG_API_KEY) return;
+        if (!GOONG_API_KEY) {
+            setNotification({ message: t('mapApiKeyError'), type: 'error' });
+            return;
+        }
 
         setIsCalculatingRoute(true);
         removeRouteFromMap();
@@ -249,22 +252,23 @@ const LocationServicesPage: React.FC = () => {
             }
         } catch (err: any) {
             setNotification({ message: err.message || t('directionsError'), type: 'error' });
+            setRouteDirections(null); // Clear directions on error
         } finally {
             setIsCalculatingRoute(false);
         }
-    }, [removeRouteFromMap, t]);
+    }, [removeRouteFromMap, t, setNotification, setRouteDirections]);
     
     // --- Handlers ---
-    const handleRefreshLocation = () => fetchLocation(
+    const handleRefreshLocation = useCallback(() => fetchLocation(
         () => setNotification({ message: t('locationRefreshedSuccess'), type: 'success' }),
-    );
+    ), [fetchLocation, t]);
     
-    const handleRequestPermission = () => {
+    const handleRequestPermission = useCallback(() => {
         setShowPermissionBanner(false);
         handleRefreshLocation();
-    };
+    }, [handleRefreshLocation]);
 
-    const handleSetHome = () => {
+    const handleSetHome = useCallback(() => {
         if (currentLocation) {
             setHomeLocation(currentLocation);
             setNotification({ message: t('homeSetSuccess'), type: 'success' });
@@ -272,15 +276,15 @@ const LocationServicesPage: React.FC = () => {
         } else {
             setNotification({ message: t('homeSetError'), type: 'error' });
         }
-    };
+    }, [currentLocation, setHomeLocation, t, ttsSupported, speak]);
     
-    const handleOpenSaveModal = (loc: SavedLocation | null) => {
+    const handleOpenSaveModal = useCallback((loc: SavedLocation | null) => {
         setEditingLocation(loc);
         setNewLocationName(loc ? loc.name : '');
         setIsSaveModalOpen(true);
-    };
+    }, []);
 
-    const handleSaveOrUpdateLocation = (e: React.FormEvent) => {
+    const handleSaveOrUpdateLocation = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         if (!newLocationName.trim()) { setNotification({ message: t('locationNameRequired'), type: 'error' }); return; }
 
@@ -295,34 +299,34 @@ const LocationServicesPage: React.FC = () => {
             setNotification({ message: t('locationSavedSuccess', newLoc.name), type: 'success' });
         }
         setIsSaveModalOpen(false);
-    };
+    }, [newLocationName, editingLocation, currentLocation, setSavedLocations, t]);
     
-    const handleDeleteLocation = (id: string) => {
+    const handleDeleteLocation = useCallback((id: string) => {
         const loc = savedLocations.find(l => l.id === id);
         if (loc && window.confirm(t('confirmDeleteLocation', loc.name))) {
             setSavedLocations(prev => prev.filter(l => l.id !== id));
             setNotification({ message: t('locationDeletedInfo'), type: 'info' });
         }
-    };
+    }, [savedLocations, setSavedLocations, t]);
 
-    const handleGuideHome = () => {
+    const handleGuideHome = useCallback(() => {
         if (!homeLocation) { setNotification({ message: t('guideHomeNotSetInfo'), type: 'info' }); return; }
         calculateAndDisplayRoute(currentLocation, homeLocation);
-    };
+    }, [homeLocation, currentLocation, calculateAndDisplayRoute, t]);
 
-    const handleGuideToDestination = () => {
+    const handleGuideToDestination = useCallback(() => {
         if (!destination.trim()) { setNotification({ message: t('destinationMissingInfo'), type: 'info' }); return; }
         calculateAndDisplayRoute(currentLocation, destination);
-    };
+    }, [destination, currentLocation, calculateAndDisplayRoute, t]);
 
-    const handleReadDirections = () => {
+    const handleReadDirections = useCallback(() => {
         if (ttsSupported && routeDirections) {
-            const allStepsText = routeDirections.map((step: any) => step.instruction).join('. ');
+            const allStepsText = routeDirections.map((step: any) => step.instruction.replace(/<[^>]*>/g, '')).join('. ');
             speak(`${t('directionsTitle')} ${allStepsText}`);
         }
-    };
+    }, [ttsSupported, routeDirections, speak, t]);
 
-    const handleNotifyFamily = () => {
+    const handleNotifyFamily = useCallback(() => {
         if (familyEmails.length === 0) {
             setNotification({ message: t('notifyFamilyNoEmails'), type: 'error' }); return;
         }
@@ -332,8 +336,9 @@ const LocationServicesPage: React.FC = () => {
         const { latitude, longitude } = currentLocation;
         const mailtoLink = `mailto:${familyEmails.join(',')}?subject=${encodeURIComponent(t('notifyFamilyEmailSubject'))}&body=${encodeURIComponent(t('notifyFamilyEmailBody', latitude, longitude, latitude, longitude))}`;
         window.location.href = mailtoLink;
-    };
+    }, [familyEmails, currentLocation, t]);
 
+    const handleOpenSaveSpotModal = useCallback(() => handleOpenSaveModal(null), [handleOpenSaveModal]);
 
     return (
         <div className="space-y-10 animate-fadeIn">
@@ -361,7 +366,7 @@ const LocationServicesPage: React.FC = () => {
                     homeLocation={homeLocation}
                     onRefresh={handleRefreshLocation}
                     onSetHome={handleSetHome}
-                    onSaveSpot={() => handleOpenSaveModal(null)}
+                    onSaveSpot={handleOpenSaveSpotModal}
                     t={t}
                 />
             </div>
