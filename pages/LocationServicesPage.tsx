@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import goongJs from '@goongmaps/goong-js';
-import GoongSdk from '@goongmaps/goong-sdk';
-import '@goongmaps/goong-js/dist/goong-js.css';
+import maplibregl, { LngLatBounds } from 'maplibre-gl';
+import { GeocoderAutocomplete } from '@geoapify/geocoder-autocomplete';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { LocationInfo, SavedLocation } from '../types';
 import Button from '../components/common/Button';
@@ -15,14 +15,12 @@ import { useTranslation } from '../contexts';
 import LocationPermissionBanner from '../components/LocationPermissionBanner';
 import { useGeolocation } from '../hooks/useGeolocation';
 
-// --- Constants & SDK Initialization ---
-const GOONG_API_KEY = process.env.GOONG_API_KEY;
-const GOONG_MAPTILES_KEY = process.env.GOONG_MAPTILES_KEY;
+// --- Constants ---
+const GEOAPIFY_API_KEY = process.env.GEOAPIFY_API_KEY;
 
 const formInputStyle = "block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base text-slate-900 placeholder:text-slate-400";
 
 // --- Sub-components ---
-
 const LocationMap = React.memo<{ mapRef: React.RefObject<HTMLDivElement>; isLoading: boolean; hasLocation: boolean; permissionStatus: PermissionState; t: (key: any) => string; }>
 (({ mapRef, isLoading, hasLocation, permissionStatus, t }) => (
     <div ref={mapRef} className="w-full h-64 md:h-96 bg-slate-200 flex items-center justify-center text-slate-500" role="application" aria-label="Interactive Map">
@@ -76,16 +74,16 @@ const CurrentLocationCard = React.memo<{
 });
 
 const NavigationCard = React.memo<{
-    destination: string;
-    setDestination: (dest: string) => void;
+    destinationInputContainerRef: React.RefObject<HTMLDivElement>;
     isCalculatingRoute: boolean;
     routeDirections: any[] | null;
+    selectedDestination: LocationInfo | null;
     onGuideToDestination: () => void;
     onGuideHome: () => void;
     onReadDirections: () => void;
     t: (key: any, ...args: any[]) => string;
 }>((props) => {
-    const { destination, setDestination, isCalculatingRoute, routeDirections, onGuideToDestination, onGuideHome, onReadDirections, t } = props;
+    const { destinationInputContainerRef, isCalculatingRoute, routeDirections, selectedDestination, onGuideToDestination, onGuideHome, onReadDirections, t } = props;
 
     return (
         <div className="bg-white p-4 md:p-6 rounded-xl shadow-md space-y-4">
@@ -93,11 +91,11 @@ const NavigationCard = React.memo<{
             <div className="flex flex-col md:flex-row gap-4 items-end">
                 <div className="w-full md:flex-1">
                     <label htmlFor="destinationInput" className="block text-sm font-medium text-slate-700 mb-1">{t('destinationLabel')}</label>
-                    <input type="text" id="destinationInput" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder={t('destinationPlaceholder')} className={formInputStyle} aria-label={t('destinationLabel')} />
+                    <div id="destinationInput" ref={destinationInputContainerRef} className="autocomplete-container" />
                 </div>
                 <div className="flex items-end gap-3 w-full md:w-auto">
-                    <Button onClick={onGuideToDestination} disabled={isCalculatingRoute || !destination.trim()} isLoading={isCalculatingRoute && !!destination.trim()} leftIcon={<MapPinIcon className="w-5 h-5" />} size="md" variant="secondary" className="flex-1 md:flex-initial">{t('guideToDestinationButton')}</Button>
-                    <Button onClick={onGuideHome} disabled={isCalculatingRoute} isLoading={isCalculatingRoute && !destination.trim()} leftIcon={<HomeIcon className="w-5 h-5" />} size="md" variant="primary" className="flex-1 md:flex-initial">{t('guideHomeButton')}</Button>
+                    <Button onClick={onGuideToDestination} disabled={isCalculatingRoute || !selectedDestination} isLoading={isCalculatingRoute && !!selectedDestination} leftIcon={<MapPinIcon className="w-5 h-5" />} size="md" variant="secondary" className="flex-1 md:flex-initial">{t('guideToDestinationButton')}</Button>
+                    <Button onClick={onGuideHome} disabled={isCalculatingRoute} leftIcon={<HomeIcon className="w-5 h-5" />} size="md" variant="primary" className="flex-1 md:flex-initial">{t('guideHomeButton')}</Button>
                 </div>
             </div>
 
@@ -109,7 +107,7 @@ const NavigationCard = React.memo<{
                         <Button onClick={onReadDirections} variant="ghost" size="sm" leftIcon={<SpeakerWaveIcon className="w-5 h-5" />}>{t('readDirectionsButton')}</Button>
                     </div>
                     <ol className="list-decimal list-inside space-y-1.5 text-slate-700 text-sm md:text-base">
-                        {routeDirections.map((step, index) => <li key={index} dangerouslySetInnerHTML={{ __html: step.instruction }}></li>)}
+                        {routeDirections.map((step, index) => <li key={index}>{step.instruction.text}</li>)}
                     </ol>
                 </div>
             )}
@@ -119,7 +117,7 @@ const NavigationCard = React.memo<{
 
 // --- Main Page Component ---
 const LocationServicesPage: React.FC = () => {
-    const { t } = useTranslation();
+    const { t, language } = useTranslation();
     const { speak, isSupported: ttsSupported, error: ttsError } = useTextToSpeech();
 
     // State
@@ -128,7 +126,7 @@ const LocationServicesPage: React.FC = () => {
     const [homeLocation, setHomeLocation] = useLocalStorage<LocationInfo | null>('memorycare_homeLocation', null);
     const [savedLocations, setSavedLocations] = useLocalStorage<SavedLocation[]>('memorycare_saved_locations', []);
     const [familyEmails] = useLocalStorage<string[]>('memorycare_family_emails', []);
-    const [destination, setDestination] = useState('');
+    const [selectedDestination, setSelectedDestination] = useState<LocationInfo | null>(null);
     const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
     const [routeDirections, setRouteDirections] = useState<any[] | null>(null);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -138,12 +136,13 @@ const LocationServicesPage: React.FC = () => {
 
     // Refs
     const mapRef = useRef<HTMLDivElement>(null);
-    const mapInstance = useRef<goongJs.Map | null>(null);
-    const userMarker = useRef<goongJs.Marker | null>(null);
+    const mapInstance = useRef<maplibregl.Map | null>(null);
+    const userMarker = useRef<maplibregl.Marker | null>(null);
+    const destinationInputContainerRef = useRef<HTMLDivElement>(null);
 
     // Effects
     useEffect(() => {
-        if (!GOONG_API_KEY || !GOONG_MAPTILES_KEY) {
+        if (!GEOAPIFY_API_KEY) {
             setNotification({ message: t('mapApiKeyError'), type: 'error' });
         }
     }, [t]);
@@ -162,13 +161,12 @@ const LocationServicesPage: React.FC = () => {
         }
     }, [permissionStatus]);
 
-
     useEffect(() => {
-        if (mapRef.current && !mapInstance.current && currentLocation) {
-            goongJs.accessToken = GOONG_MAPTILES_KEY!;
-            mapInstance.current = new goongJs.Map({
+        if (mapRef.current && !mapInstance.current && currentLocation && GEOAPIFY_API_KEY) {
+            const style = `https://maps.geoapify.com/v1/styles/osm-bright/style.json?apiKey=${GEOAPIFY_API_KEY}`;
+            mapInstance.current = new maplibregl.Map({
                 container: mapRef.current,
-                style: 'https://tiles.goong.io/assets/goong_map_web.json',
+                style: style,
                 center: [currentLocation.longitude, currentLocation.latitude],
                 zoom: 12,
             });
@@ -187,12 +185,42 @@ const LocationServicesPage: React.FC = () => {
             mapInstance.current.flyTo({ center: userPos, zoom: 16 });
 
             if (!userMarker.current) {
-                userMarker.current = new goongJs.Marker().setLngLat(userPos).addTo(mapInstance.current);
+                userMarker.current = new maplibregl.Marker().setLngLat(userPos).addTo(mapInstance.current);
             } else {
                 userMarker.current.setLngLat(userPos);
             }
         }
     }, [currentLocation]);
+
+    useEffect(() => {
+        if (destinationInputContainerRef.current && GEOAPIFY_API_KEY) {
+            const autocomplete = new GeocoderAutocomplete(
+                destinationInputContainerRef.current,
+                GEOAPIFY_API_KEY,
+                {
+                    placeholder: t('destinationPlaceholder'),
+                    lang: language,
+                }
+            );
+            autocomplete.on('select', (location) => {
+                if (location) {
+                    const newDestination: LocationInfo = {
+                        latitude: location.properties.lat,
+                        longitude: location.properties.lon,
+                        address: location.properties.formatted,
+                    };
+                    setSelectedDestination(newDestination);
+                    if (currentLocation) {
+                        calculateAndDisplayRoute(currentLocation, newDestination);
+                    }
+                }
+            });
+            return () => {
+                autocomplete.destroy();
+            };
+        }
+    }, [GEOAPIFY_API_KEY, language, t, currentLocation]); // Re-init if lang changes or currentLocation becomes available
+
 
     const removeRouteFromMap = useCallback(() => {
         if (mapInstance.current?.isStyleLoaded()) {
@@ -203,9 +231,8 @@ const LocationServicesPage: React.FC = () => {
         setRouteDirections(null);
     }, []);
 
-    const calculateAndDisplayRoute = useCallback(async (origin: LocationInfo | null, destinationInfo: LocationInfo | string) => {
-        if (!origin) { setNotification({ message: t('guideHomeError'), type: 'error' }); return; }
-        if (!GOONG_API_KEY) {
+    const calculateAndDisplayRoute = useCallback(async (origin: LocationInfo, destinationInfo: LocationInfo) => {
+        if (!GEOAPIFY_API_KEY) {
             setNotification({ message: t('mapApiKeyError'), type: 'error' });
             return;
         }
@@ -213,47 +240,35 @@ const LocationServicesPage: React.FC = () => {
         setIsCalculatingRoute(true);
         removeRouteFromMap();
         
-        const baseClient = GoongSdk({ accessToken: GOONG_API_KEY });
-        const { geocoding: geocodingService, directions: directionsService } = baseClient;
-
+        const routingUrl = `https://api.geoapify.com/v1/routing?waypoints=${origin.latitude},${origin.longitude}|${destinationInfo.latitude},${destinationInfo.longitude}&mode=drive&details=instruction_details&lang=${language}&apiKey=${GEOAPIFY_API_KEY}`;
+        
         try {
-            let destCoordinates: { latitude: number; longitude: number; };
+            const response = await fetch(routingUrl);
+            const result = await response.json();
 
-            if (typeof destinationInfo === 'string') {
-                const geocodeResponse = await geocodingService.geocode({ address: destinationInfo }).send();
-                if (!geocodeResponse.body.results.length) throw new Error(t('geocodeError', destinationInfo));
-                const { lat, lng } = geocodeResponse.body.results[0].geometry.location;
-                destCoordinates = { latitude: lat, longitude: lng };
-            } else {
-                destCoordinates = destinationInfo;
-            }
-            
-            const directionsResponse = await directionsService.getDirections({
-                origin: `${origin.latitude},${origin.longitude}`,
-                destination: `${destCoordinates.latitude},${destCoordinates.longitude}`,
-                vehicle: 'car'
-            }).send();
-            
-            if (directionsResponse.body.routes.length > 0) {
-                const { geometry, legs } = directionsResponse.body.routes[0];
+            if (result.features?.length > 0) {
+                const geometry = result.features[0].geometry;
+                const routeSteps = result.features[0].properties.legs[0].steps;
+
                 if (mapInstance.current?.isStyleLoaded()) {
                     mapInstance.current.addSource('route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry } });
                     mapInstance.current.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#4f46e5', 'line-width': 6, 'line-opacity': 0.9 } });
                     
-                    const bounds = geometry.coordinates.reduce((b, coord) => b.extend(coord), new goongJs.LngLatBounds(geometry.coordinates[0], geometry.coordinates[0]));
+                    const coordinates = geometry.coordinates[0];
+                    const bounds = coordinates.reduce((b: LngLatBounds, coord: [number, number]) => b.extend(coord), new LngLatBounds(coordinates[0], coordinates[0]));
                     mapInstance.current.fitBounds(bounds, { padding: { top: 50, bottom: 150, left: 50, right: 50 } });
                 }
-                if (legs[0]?.steps) setRouteDirections(legs[0].steps);
+                setRouteDirections(routeSteps);
             } else {
-                throw new Error(t('directionsError'));
+                 throw new Error(result.message || t('directionsError'));
             }
         } catch (err: any) {
             setNotification({ message: err.message || t('directionsError'), type: 'error' });
-            setRouteDirections(null); // Clear directions on error
+            setRouteDirections(null);
         } finally {
             setIsCalculatingRoute(false);
         }
-    }, [removeRouteFromMap, t]);
+    }, [removeRouteFromMap, t, language]);
     
     // --- Handlers ---
     const handleRefreshLocation = useCallback(() => fetchLocation(
@@ -308,17 +323,19 @@ const LocationServicesPage: React.FC = () => {
 
     const handleGuideHome = useCallback(() => {
         if (!homeLocation) { setNotification({ message: t('guideHomeNotSetInfo'), type: 'info' }); return; }
+        if (!currentLocation) { setNotification({ message: t('guideHomeError'), type: 'error' }); return; }
         calculateAndDisplayRoute(currentLocation, homeLocation);
     }, [homeLocation, currentLocation, calculateAndDisplayRoute, t]);
 
     const handleGuideToDestination = useCallback(() => {
-        if (!destination.trim()) { setNotification({ message: t('destinationMissingInfo'), type: 'info' }); return; }
-        calculateAndDisplayRoute(currentLocation, destination);
-    }, [destination, currentLocation, calculateAndDisplayRoute, t]);
+        if (!selectedDestination) { setNotification({ message: t('destinationMissingInfo'), type: 'info' }); return; }
+        if (!currentLocation) { setNotification({ message: t('guideHomeError'), type: 'error' }); return; }
+        calculateAndDisplayRoute(currentLocation, selectedDestination);
+    }, [selectedDestination, currentLocation, calculateAndDisplayRoute, t]);
 
     const handleReadDirections = useCallback(() => {
         if (ttsSupported && routeDirections) {
-            const allStepsText = routeDirections.map((step: any) => step.instruction.replace(/<[^>]*>/g, '')).join('. ');
+            const allStepsText = routeDirections.map((step: any) => step.instruction.text).join('. ');
             speak(`${t('directionsTitle')} ${allStepsText}`);
         }
     }, [ttsSupported, routeDirections, speak, t]);
@@ -338,6 +355,11 @@ const LocationServicesPage: React.FC = () => {
     const handleOpenSaveSpotModal = useCallback(() => handleOpenSaveModal(null), [handleOpenSaveModal]);
     
     const handleCloseSaveModal = useCallback(() => setIsSaveModalOpen(false), []);
+    
+    const handleGuideToSavedPlace = useCallback((place: SavedLocation) => {
+        if (!currentLocation) { setNotification({ message: t('guideHomeError'), type: 'error' }); return; }
+        calculateAndDisplayRoute(currentLocation, place.location);
+    }, [currentLocation, calculateAndDisplayRoute, t]);
 
     return (
         <div className="space-y-10 animate-fadeIn">
@@ -371,10 +393,10 @@ const LocationServicesPage: React.FC = () => {
             </div>
             
             <NavigationCard
-                destination={destination}
-                setDestination={setDestination}
+                destinationInputContainerRef={destinationInputContainerRef}
                 isCalculatingRoute={isCalculatingRoute}
                 routeDirections={routeDirections}
+                selectedDestination={selectedDestination}
                 onGuideHome={handleGuideHome}
                 onGuideToDestination={handleGuideToDestination}
                 onReadDirections={handleReadDirections}
@@ -394,7 +416,7 @@ const LocationServicesPage: React.FC = () => {
                                     <span className="font-medium text-slate-800 break-all">{place.name}</span>
                                 </div>
                                 <div className="flex space-x-2 flex-shrink-0 self-end sm:self-center">
-                                    <Button onClick={() => calculateAndDisplayRoute(currentLocation, place.location)} disabled={!currentLocation || isCalculatingRoute} size="sm" variant="ghost">{t('guideHereButton')}</Button>
+                                    <Button onClick={() => handleGuideToSavedPlace(place)} disabled={!currentLocation || isCalculatingRoute} size="sm" variant="ghost">{t('guideHereButton')}</Button>
                                     <Button onClick={() => handleOpenSaveModal(place)} variant="secondary" size="sm" aria-label={`Edit ${place.name}`}><PencilIcon className="w-5 h-5" /></Button>
                                     <Button onClick={() => handleDeleteLocation(place.id)} variant="danger" size="sm" aria-label={`Delete ${place.name}`}><TrashIcon className="w-5 h-5" /></Button>
                                 </div>
