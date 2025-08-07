@@ -139,6 +139,9 @@ const LocationServicesPage: React.FC = () => {
     const mapInstance = useRef<maplibregl.Map | null>(null);
     const userMarker = useRef<maplibregl.Marker | null>(null);
     const destinationInputContainerRef = useRef<HTMLDivElement>(null);
+    const currentLocationRef = useRef<LocationInfo | null>(currentLocation);
+    currentLocationRef.current = currentLocation;
+
 
     // Effects
     useEffect(() => {
@@ -160,8 +163,10 @@ const LocationServicesPage: React.FC = () => {
             setShowPermissionBanner(false);
         }
     }, [permissionStatus]);
-
+    
+    // Effect to initialize and update the map
     useEffect(() => {
+        // Initialize map if it doesn't exist and we have a location
         if (mapRef.current && !mapInstance.current && currentLocation && GEOAPIFY_API_KEY) {
             const style = `https://maps.geoapify.com/v1/styles/osm-bright/style.json?apiKey=${GEOAPIFY_API_KEY}`;
             mapInstance.current = new maplibregl.Map({
@@ -171,56 +176,29 @@ const LocationServicesPage: React.FC = () => {
                 zoom: 12,
             });
         }
-        return () => {
-            if (mapInstance.current) {
-                mapInstance.current.remove();
-                mapInstance.current = null;
-            }
-        };
-    }, [currentLocation]);
-
-    useEffect(() => {
+    
+        // Update map view when location changes
         if (mapInstance.current && currentLocation) {
             const userPos: [number, number] = [currentLocation.longitude, currentLocation.latitude];
             mapInstance.current.flyTo({ center: userPos, zoom: 16 });
-
+    
             if (!userMarker.current) {
                 userMarker.current = new maplibregl.Marker().setLngLat(userPos).addTo(mapInstance.current);
             } else {
                 userMarker.current.setLngLat(userPos);
             }
         }
-    }, [currentLocation]);
+    }, [currentLocation, GEOAPIFY_API_KEY]);
 
+    // Effect to cleanup map on component unmount
     useEffect(() => {
-        if (destinationInputContainerRef.current && GEOAPIFY_API_KEY) {
-            const autocomplete = new GeocoderAutocomplete(
-                destinationInputContainerRef.current,
-                GEOAPIFY_API_KEY,
-                {
-                    placeholder: t('destinationPlaceholder'),
-                    lang: language,
-                }
-            );
-            autocomplete.on('select', (location) => {
-                if (location) {
-                    const newDestination: LocationInfo = {
-                        latitude: location.properties.lat,
-                        longitude: location.properties.lon,
-                        address: location.properties.formatted,
-                    };
-                    setSelectedDestination(newDestination);
-                    if (currentLocation) {
-                        calculateAndDisplayRoute(currentLocation, newDestination);
-                    }
-                }
-            });
-            return () => {
-                (autocomplete as any).destroy();
-            };
-        }
-    }, [GEOAPIFY_API_KEY, language, t, currentLocation]); // Re-init if lang changes or currentLocation becomes available
-
+        return () => {
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+            }
+        };
+    }, []);
 
     const removeRouteFromMap = useCallback(() => {
         if (mapInstance.current?.isStyleLoaded()) {
@@ -269,7 +247,38 @@ const LocationServicesPage: React.FC = () => {
             setIsCalculatingRoute(false);
         }
     }, [removeRouteFromMap, t, language]);
-    
+
+    // Effect for initializing the geocoder autocomplete
+    useEffect(() => {
+        if (destinationInputContainerRef.current && GEOAPIFY_API_KEY) {
+            const autocomplete = new GeocoderAutocomplete(
+                destinationInputContainerRef.current,
+                GEOAPIFY_API_KEY,
+                {
+                    placeholder: t('destinationPlaceholder'),
+                    lang: language,
+                }
+            );
+            autocomplete.on('select', (location) => {
+                if (location) {
+                    const newDestination: LocationInfo = {
+                        latitude: location.properties.lat,
+                        longitude: location.properties.lon,
+                        address: location.properties.formatted,
+                    };
+                    setSelectedDestination(newDestination);
+                    if (currentLocationRef.current) {
+                        calculateAndDisplayRoute(currentLocationRef.current, newDestination);
+                    }
+                }
+            });
+            return () => {
+                (autocomplete as any).destroy();
+            };
+        }
+    }, [GEOAPIFY_API_KEY, language, t, calculateAndDisplayRoute]);
+
+
     // --- Handlers ---
     const handleRefreshLocation = useCallback(() => fetchLocation(
         () => setNotification({ message: t('locationRefreshedSuccess'), type: 'success' }),
