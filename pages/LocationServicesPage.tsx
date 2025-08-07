@@ -216,7 +216,7 @@ const LocationServicesPage: React.FC = () => {
                 }
             });
             return () => {
-                autocomplete.destroy();
+                (autocomplete as any).destroy();
             };
         }
     }, [GEOAPIFY_API_KEY, language, t, currentLocation]); // Re-init if lang changes or currentLocation becomes available
