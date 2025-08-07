@@ -166,7 +166,6 @@ const LocationServicesPage: React.FC = () => {
     
     // Effect to initialize and update the map
     useEffect(() => {
-        // Initialize map if it doesn't exist and we have a location
         if (mapRef.current && !mapInstance.current && currentLocation && GEOAPIFY_API_KEY) {
             const style = `https://maps.geoapify.com/v1/styles/osm-bright/style.json?apiKey=${GEOAPIFY_API_KEY}`;
             mapInstance.current = new maplibregl.Map({
@@ -177,7 +176,6 @@ const LocationServicesPage: React.FC = () => {
             });
         }
     
-        // Update map view when location changes
         if (mapInstance.current && currentLocation) {
             const userPos: [number, number] = [currentLocation.longitude, currentLocation.latitude];
             mapInstance.current.flyTo({ center: userPos, zoom: 16 });
@@ -188,7 +186,7 @@ const LocationServicesPage: React.FC = () => {
                 userMarker.current.setLngLat(userPos);
             }
         }
-    }, [currentLocation, GEOAPIFY_API_KEY]);
+    }, [currentLocation]);
 
     // Effect to cleanup map on component unmount
     useEffect(() => {
@@ -225,32 +223,35 @@ const LocationServicesPage: React.FC = () => {
             const result = await response.json();
 
             if (result.features?.length > 0) {
-                const geometry = result.features[0].geometry;
-                const routeSteps = result.features[0].properties.legs[0].steps;
+                const geometry = result.features[0]?.geometry;
+                const routeSteps = result.features[0]?.properties?.legs?.[0]?.steps;
 
-                if (mapInstance.current?.isStyleLoaded()) {
-                    mapInstance.current.addSource('route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry } });
-                    mapInstance.current.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#4f46e5', 'line-width': 6, 'line-opacity': 0.9 } });
-                    
-                    const coordinates = geometry.coordinates;
-                    const bounds = new maplibregl.LngLatBounds();
+                if (geometry && routeSteps) {
+                    if (mapInstance.current?.isStyleLoaded()) {
+                        mapInstance.current.addSource('route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry } });
+                        mapInstance.current.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#4f46e5', 'line-width': 6, 'line-opacity': 0.9 } });
+                        
+                        const coordinates = geometry.coordinates;
+                        const bounds = new maplibregl.LngLatBounds();
 
-                    if (geometry.type === 'MultiLineString') {
-                        // It's an array of LineStrings
-                        coordinates.forEach((line: any) => {
-                            line.forEach((point: any) => {
+                        if (geometry.type === 'MultiLineString') {
+                            coordinates.forEach((line: any) => {
+                                line.forEach((point: any) => {
+                                    bounds.extend(point);
+                                });
+                            });
+                        } else { // Handles LineString
+                            coordinates.forEach((point: any) => {
                                 bounds.extend(point);
                             });
-                        });
-                    } else { // It's a LineString
-                        coordinates.forEach((point: any) => {
-                            bounds.extend(point);
-                        });
-                    }
+                        }
 
-                    mapInstance.current.fitBounds(bounds, { padding: { top: 50, bottom: 150, left: 50, right: 50 } });
+                        mapInstance.current.fitBounds(bounds, { padding: { top: 50, bottom: 150, left: 50, right: 50 } });
+                    }
+                    setRouteDirections(routeSteps);
+                } else {
+                    throw new Error(t('directionsError'));
                 }
-                setRouteDirections(routeSteps);
             } else {
                  throw new Error(result.message || t('directionsError'));
             }
@@ -264,33 +265,50 @@ const LocationServicesPage: React.FC = () => {
 
     // Effect for initializing the geocoder autocomplete
     useEffect(() => {
-        if (destinationInputContainerRef.current && GEOAPIFY_API_KEY) {
-            const autocomplete = new GeocoderAutocomplete(
-                destinationInputContainerRef.current,
-                GEOAPIFY_API_KEY,
-                {
-                    placeholder: t('destinationPlaceholder'),
-                    lang: language,
+        if (!destinationInputContainerRef.current || !GEOAPIFY_API_KEY) {
+            return;
+        }
+
+        const autocompleteOptions: any = {
+            placeholder: t('destinationPlaceholder'),
+            lang: language,
+        };
+
+        if (currentLocation) {
+            autocompleteOptions.bias = {
+                proximity: {
+                    lon: currentLocation.longitude,
+                    lat: currentLocation.latitude
                 }
-            );
-            autocomplete.on('select', (location) => {
-                if (location) {
-                    const newDestination: LocationInfo = {
-                        latitude: location.properties.lat,
-                        longitude: location.properties.lon,
-                        address: location.properties.formatted,
-                    };
-                    setSelectedDestination(newDestination);
-                    if (currentLocationRef.current) {
-                        calculateAndDisplayRoute(currentLocationRef.current, newDestination);
-                    }
-                }
-            });
-            return () => {
-                (autocomplete as any).destroy();
             };
         }
-    }, [GEOAPIFY_API_KEY, language, t, calculateAndDisplayRoute]);
+
+        const autocomplete = new GeocoderAutocomplete(
+            destinationInputContainerRef.current,
+            GEOAPIFY_API_KEY,
+            autocompleteOptions
+        );
+
+        autocomplete.on('select', (location) => {
+            if (location) {
+                const newDestination: LocationInfo = {
+                    latitude: location.properties.lat,
+                    longitude: location.properties.lon,
+                    address: location.properties.formatted,
+                };
+                setSelectedDestination(newDestination);
+                if (currentLocationRef.current) {
+                    calculateAndDisplayRoute(currentLocationRef.current, newDestination);
+                } else {
+                    setNotification({ message: t('guideHomeError'), type: 'error' });
+                }
+            }
+        });
+        
+        return () => {
+            (autocomplete as any).destroy();
+        };
+    }, [GEOAPIFY_API_KEY, language, t, calculateAndDisplayRoute, currentLocation]);
 
 
     // --- Handlers ---
