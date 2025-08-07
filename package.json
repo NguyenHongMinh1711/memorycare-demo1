@@ -10,14 +10,16 @@
   },
   "dependencies": {
     "@google/genai": "^1.4.0",
-    "@goongmaps/goong-js": "^1.0.9",
-    "@goongmaps/goong-sdk": "^1.0.7",
+    "@geoapify/geocoder-autocomplete": "^2.0.1",
+    "@geoapify/sdk": "^2.0.2",
     "idb": "^8.0.0",
+    "maplibre-gl": "^4.1.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.2"
   },
   "devDependencies": {
+    "@types/maplibre-gl": "^4.1.0",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
