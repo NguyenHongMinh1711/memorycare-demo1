@@ -120,6 +120,4 @@ interface Window {
     webkitSpeechRecognition?: typeof SpeechRecognition;
     // speechSynthesis is typically part of lib.dom.d.ts
     // speechSynthesis: SpeechSynthesis; 
-    goongJs: any;
-    goongsdk: any;
 }
