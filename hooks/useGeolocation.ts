@@ -10,41 +10,34 @@ interface GeolocationState {
 
 /**
  * A custom hook to manage geolocation, including permissions and fetching the user's current location.
+ * This version is improved for robustness and state consistency.
  */
 export const useGeolocation = () => {
   const [state, setState] = useState<GeolocationState>({
     permissionStatus: 'prompt',
     currentLocation: null,
-    isLoading: true,
+    isLoading: true, // Start as loading until permission is determined
     error: null,
   });
 
-  // A stable function to fetch the location, with optional callbacks for success and error.
   const fetchLocation = useCallback(
     (
       onSuccess?: (loc: LocationInfo) => void,
       onError?: (err: GeolocationPositionError) => void
     ) => {
-      setState((prevState) => ({ ...prevState, isLoading: true, error: null }));
+      setState((s) => ({ ...s, isLoading: true, error: null }));
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const loc: LocationInfo = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           };
-          setState((prevState) => ({
-            ...prevState,
-            currentLocation: loc,
-            isLoading: false,
-          }));
+          setState((s) => ({ ...s, currentLocation: loc, isLoading: false, error: null }));
           onSuccess?.(loc);
         },
         (geoError) => {
-          setState((prevState) => ({
-            ...prevState,
-            error: geoError,
-            isLoading: false,
-          }));
+          setState((s) => ({ ...s, error: geoError, isLoading: false }));
           onError?.(geoError);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -53,41 +46,45 @@ export const useGeolocation = () => {
     []
   );
 
-  // Effect to handle permission status changes and initial load.
   useEffect(() => {
-    let permissionStatusRef: PermissionStatus;
-
-    const handlePermissionChange = () => {
-      setState((prevState) => ({ ...prevState, permissionStatus: permissionStatusRef.state }));
-      if (permissionStatusRef.state === 'granted') {
-        fetchLocation();
-      } else {
-        // Stop loading if permission is denied or reset to prompt
-        setState((prevState) => ({ ...prevState, isLoading: false }));
-      }
-    };
-
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: 'geolocation' }).then((status) => {
-        permissionStatusRef = status;
-        setState((prevState) => ({ ...prevState, permissionStatus: status.state }));
-        if (status.state === 'granted') {
-          fetchLocation();
-        } else {
-          // If permission is not granted, we are not loading the location initially.
-          setState((prevState) => ({ ...prevState, isLoading: false }));
-        }
-        status.onchange = handlePermissionChange;
-      }).catch(() => {
-        // If query fails, assume prompt and stop loading.
-        setState((prevState) => ({ ...prevState, permissionStatus: 'prompt', isLoading: false }));
-      });
-    } else {
-      // Fallback for older browsers.
-      setState((prevState) => ({ ...prevState, permissionStatus: 'prompt', isLoading: false }));
+    if (!navigator.permissions) {
+      // Fallback for older browsers. Assumes permission needs to be prompted.
+      // Can't know for sure, but it's a safe bet. Stop loading.
+      setState((s) => ({ ...s, permissionStatus: 'prompt', isLoading: false }));
+      return;
     }
 
-    // Cleanup function
+    let permissionStatusRef: PermissionStatus;
+    
+    const handlePermissionChange = () => {
+        const newStatus = permissionStatusRef.state;
+        if (newStatus === 'granted') {
+            setState(s => ({ ...s, permissionStatus: newStatus }));
+            fetchLocation();
+        } else {
+            // If denied or prompt, stop loading and clear location data.
+            setState(s => ({ ...s, permissionStatus: newStatus, isLoading: false, currentLocation: null }));
+        }
+    };
+
+    navigator.permissions.query({ name: 'geolocation' }).then((status) => {
+        permissionStatusRef = status;
+        const initialStatus = status.state;
+        
+        if (initialStatus === 'granted') {
+            setState(s => ({ ...s, permissionStatus: initialStatus }));
+            fetchLocation();
+        } else {
+            // Not granted initially, so we stop loading.
+            setState(s => ({ ...s, permissionStatus: initialStatus, isLoading: false }));
+        }
+        
+        status.onchange = handlePermissionChange;
+    }).catch(() => {
+        // If query fails, assume 'prompt' and stop loading.
+        setState((s) => ({ ...s, permissionStatus: 'prompt', isLoading: false }));
+    });
+    
     return () => {
       if (permissionStatusRef) {
         permissionStatusRef.onchange = null;
