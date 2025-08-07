@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import goongJs from '@goongmaps/goong-js';
 import GoongSdk from '@goongmaps/goong-sdk';
-import GoongDirections from '@goongmaps/goong-sdk/services/directions';
-import GoongGeocoding from '@goongmaps/goong-sdk/services/geocoding';
 import '@goongmaps/goong-js/dist/goong-js.css';
 
 import { LocationInfo, SavedLocation } from '../types';
@@ -216,8 +214,7 @@ const LocationServicesPage: React.FC = () => {
         removeRouteFromMap();
         
         const baseClient = GoongSdk({ accessToken: GOONG_API_KEY });
-        const geocodingService = GoongGeocoding(baseClient);
-        const directionsService = GoongDirections(baseClient);
+        const { geocoding: geocodingService, directions: directionsService } = baseClient;
 
         try {
             let destCoordinates: { latitude: number; longitude: number; };
@@ -256,7 +253,7 @@ const LocationServicesPage: React.FC = () => {
         } finally {
             setIsCalculatingRoute(false);
         }
-    }, [removeRouteFromMap, t, setNotification, setRouteDirections]);
+    }, [removeRouteFromMap, t]);
     
     // --- Handlers ---
     const handleRefreshLocation = useCallback(() => fetchLocation(
