@@ -1,84 +1,56 @@
-// service-worker.js
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { registerRoute } from 'workbox-routing';
+import { StaleWhileRevalidate, CacheFirst } from 'workbox-strategies';
+import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import { ExpirationPlugin } from 'workbox-expiration';
 
-const CACHE_NAME = 'memorycare-cache-v2'; // Bump version for update
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/maskable-icon-512x512.png',
-  // The main entry point script
-  '/index.tsx',
-  // Key CDN resources for basic offline functionality
-  'https://cdn.tailwindcss.com'
-];
-
-// Install event: open a cache and add the core assets to it.
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        // Using addAll for atomicity. If one fails, the whole install fails.
-        // This is generally safer to ensure a consistent cache state.
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => self.skipWaiting()) // Activate worker immediately
-      .catch(error => {
-          console.error('Service Worker installation failed:', error);
-      })
-  );
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
-// Activate event: clean up old caches.
-self.addEventListener('activate', event => {
-  const cacheWhitelist = [CACHE_NAME];
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-    .then(() => self.clients.claim()) // Take control of all pages
-  );
-});
+// Precache all assets injected by vite-plugin-pwa
+precacheAndRoute(self.__WB_MANIFEST);
 
-// Fetch event: serve assets from cache or network.
-self.addEventListener('fetch', event => {
-    // We only want to handle GET requests.
-    if (event.request.method !== 'GET') {
-      return;
-    }
-  
-    // Use a "stale-while-revalidate" strategy for most assets.
-    // This provides a fast response from cache, while updating it in the background.
-    event.respondWith(
-      caches.open(CACHE_NAME).then(cache => {
-        return cache.match(event.request).then(cachedResponse => {
-          const fetchPromise = fetch(event.request).then(networkResponse => {
-            // If we got a valid response, cache it and return it.
-            // Don't cache API calls to Gemini or other dynamic services
-            if (networkResponse && networkResponse.status === 200 && !event.request.url.includes('generativelanguage.googleapis.com')) {
-               cache.put(event.request, networkResponse.clone());
-            }
-            return networkResponse;
-          });
-  
-          // Return the cached response if it exists, otherwise wait for the network response.
-          return cachedResponse || fetchPromise;
-        }).catch(error => {
-            // This is a fallback for when both cache and network fail.
-            // For navigation requests, we can serve an offline page.
-            console.error('Fetch failed; letting browser handle it.', error);
-        });
-      })
-    );
-  });
-  
+// Cleanup old caches
+cleanupOutdatedCaches();
+
+// Runtime caching for assets not in the precache manifest
+// Cache fonts and images from CDNs/same-origin with a CacheFirst strategy
+registerRoute(
+  ({ request, url }) => 
+    request.destination === 'font' || 
+    request.destination === 'image' || 
+    url.hostname === 'i.pravatar.cc',
+  new CacheFirst({
+    cacheName: 'assets-cache',
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+      new ExpirationPlugin({
+        maxEntries: 60,
+        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
+      }),
+    ],
+  })
+);
+
+// Stale-while-revalidate for external JS/CSS (like tailwind, esm.sh)
+registerRoute(
+  ({ request, url }) => 
+    (request.destination === 'script' || request.destination === 'style') && 
+    url.hostname !== self.location.hostname,
+  new StaleWhileRevalidate({
+    cacheName: 'static-resources-cache',
+     plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+    ],
+  })
+);
 
 // This event listener handles clicks on notifications.
 self.addEventListener('notificationclick', event => {

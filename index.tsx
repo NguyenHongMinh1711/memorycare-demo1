@@ -3,6 +3,12 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { HashRouter } from 'react-router-dom';
 import { ThemeProvider, LanguageProvider } from './contexts';
+import { registerSW } from 'virtual:pwa-register';
+import './index.css';
+
+// Automatically register the service worker.
+// With registerType: 'autoUpdate' in vite.config.ts, this will update the PWA in the background.
+registerSW({ onOfflineReady: () => console.log('App is ready to work offline.') });
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
