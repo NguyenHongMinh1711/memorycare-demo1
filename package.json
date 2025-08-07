@@ -12,13 +12,13 @@
     "@google/genai": "^1.4.0",
     "@geoapify/geocoder-autocomplete": "^2.0.1",
     "idb": "^8.0.0",
-    "maplibre-gl": "^4.1.2",
+    "maplibre-gl": "^3.6.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.2"
   },
   "devDependencies": {
-    "@types/maplibre-gl": "^4.1.0",
+    "@types/maplibre-gl": "^3.6.2",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
