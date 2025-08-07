@@ -339,6 +339,8 @@ const LocationServicesPage: React.FC = () => {
     }, [familyEmails, currentLocation, t]);
 
     const handleOpenSaveSpotModal = useCallback(() => handleOpenSaveModal(null), [handleOpenSaveModal]);
+    
+    const handleCloseSaveModal = useCallback(() => setIsSaveModalOpen(false), []);
 
     return (
         <div className="space-y-10 animate-fadeIn">
@@ -410,14 +412,14 @@ const LocationServicesPage: React.FC = () => {
                 <Button onClick={handleNotifyFamily} size="md" variant="danger">{t('notifyFamilyButton')}</Button>
             </div>
 
-            <Modal isOpen={isSaveModalOpen} onClose={() => setIsSaveModalOpen(false)} title={editingLocation ? t('modalEditLocationTitle') : t('modalSaveLocationTitle')}>
+            <Modal isOpen={isSaveModalOpen} onClose={handleCloseSaveModal} title={editingLocation ? t('modalEditLocationTitle') : t('modalSaveLocationTitle')}>
                 <form onSubmit={handleSaveOrUpdateLocation} className="space-y-4">
                     <div>
                         <label htmlFor="locationName" className="block text-sm font-medium text-slate-700">{t('formLocationNameLabel')}</label>
                         <input type="text" id="locationName" value={newLocationName} onChange={(e) => setNewLocationName(e.target.value)} required placeholder={t('formLocationNamePlaceholder')} className={formInputStyle} />
                     </div>
                     <div className="flex justify-end space-x-3 pt-4">
-                        <Button type="button" variant="secondary" onClick={() => setIsSaveModalOpen(false)} size="md">{t('formCancelButton')}</Button>
+                        <Button type="button" variant="secondary" onClick={handleCloseSaveModal} size="md">{t('formCancelButton')}</Button>
                         <Button type="submit" variant="primary" size="md">{editingLocation ? t('formUpdateLocationButton') : t('formSaveLocationButton')}</Button>
                     </div>
                 </form>
