@@ -232,8 +232,22 @@ const LocationServicesPage: React.FC = () => {
                     mapInstance.current.addSource('route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry } });
                     mapInstance.current.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#4f46e5', 'line-width': 6, 'line-opacity': 0.9 } });
                     
-                    const coordinates = geometry.coordinates[0];
-                    const bounds = coordinates.reduce((b: LngLatBounds, coord: [number, number]) => b.extend(coord), new LngLatBounds(coordinates[0], coordinates[0]));
+                    const coordinates = geometry.coordinates;
+                    const bounds = new maplibregl.LngLatBounds();
+
+                    if (geometry.type === 'MultiLineString') {
+                        // It's an array of LineStrings
+                        coordinates.forEach((line: any) => {
+                            line.forEach((point: any) => {
+                                bounds.extend(point);
+                            });
+                        });
+                    } else { // It's a LineString
+                        coordinates.forEach((point: any) => {
+                            bounds.extend(point);
+                        });
+                    }
+
                     mapInstance.current.fitBounds(bounds, { padding: { top: 50, bottom: 150, left: 50, right: 50 } });
                 }
                 setRouteDirections(routeSteps);
