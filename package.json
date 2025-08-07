@@ -11,7 +11,6 @@
   "dependencies": {
     "@google/genai": "^1.4.0",
     "@geoapify/geocoder-autocomplete": "^2.0.1",
-    "@geoapify/sdk": "^2.0.2",
     "idb": "^8.0.0",
     "maplibre-gl": "^4.1.2",
     "react": "^19.1.0",
