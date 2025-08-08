@@ -274,14 +274,15 @@ const LocationServicesPage: React.FC = () => {
             lang: language,
         };
 
-        if (currentLocation) {
-            autocompleteOptions.bias = {
-                proximity: {
-                    lon: currentLocation.longitude,
-                    lat: currentLocation.latitude
-                }
-            };
-        }
+        // Proximity bias is removed to prevent re-initialization on every location change, which causes UI bugs.
+        // if (currentLocation) {
+        //     autocompleteOptions.bias = {
+        //         proximity: {
+        //             lon: currentLocation.longitude,
+        //             lat: currentLocation.latitude
+        //         }
+        //     };
+        // }
 
         const autocomplete = new GeocoderAutocomplete(
             destinationInputContainerRef.current,
@@ -304,11 +305,22 @@ const LocationServicesPage: React.FC = () => {
                 }
             }
         });
+
+        // BUG FIX: Add a listener to clear the route when the input is cleared.
+        // The 'clear' event doesn't exist on the autocomplete instance. Using 'input' 
+        // and checking for an empty value achieves the same goal.
+        autocomplete.on('input', (value) => {
+            if (!value) {
+                removeRouteFromMap();
+                setSelectedDestination(null);
+            }
+        });
         
         return () => {
             (autocomplete as any).destroy();
         };
-    }, [GEOAPIFY_API_KEY, language, t, calculateAndDisplayRoute, currentLocation]);
+    // BUG FIX: Removed 'currentLocation' from dependencies to prevent re-initializing the component on every location update.
+    }, [GEOAPIFY_API_KEY, language, t, calculateAndDisplayRoute, removeRouteFromMap]);
 
 
     // --- Handlers ---
