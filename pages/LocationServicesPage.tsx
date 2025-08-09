@@ -14,7 +14,7 @@ import Modal from '../components/common/Modal';
 import { useTranslation } from '../contexts';
 import LocationPermissionBanner from '../components/LocationPermissionBanner';
 import { useGeolocation } from '../hooks/useGeolocation';
-import { translateDirections } from '../services/geminiService'; // Import the new function
+import { translateDirections } from '../services/geminiService';
 
 // --- Constants ---
 const GEOAPIFY_API_KEY = process.env.GEOAPIFY_API_KEY || import.meta.env.VITE_GEOAPIFY_API_KEY;
@@ -86,8 +86,8 @@ const CurrentLocationCard = React.memo<{
 const NavigationCard = React.memo<{
     destinationInputContainerRef: React.RefObject<HTMLDivElement>;
     isCalculatingRoute: boolean;
-    isTranslating: boolean; // New prop
-    routeDirections: { text: string }[] | null; // Updated type
+    isTranslating: boolean;
+    routeDirections: { text: string }[] | null;
     selectedDestination: LocationInfo | null;
     onGuideToDestination: () => void;
     onGuideHome: () => void;
@@ -145,8 +145,8 @@ const LocationServicesPage: React.FC = () => {
     const [familyEmails] = useLocalStorage<string[]>('memorycare_family_emails', []);
     const [selectedDestination, setSelectedDestination] = useState<LocationInfo | null>(null);
     const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
-    const [isTranslating, setIsTranslating] = useState(false); // New state
-    const [routeDirections, setRouteDirections] = useState<{ text: string }[] | null>(null); // Updated type
+    const [isTranslating, setIsTranslating] = useState(false);
+    const [routeDirections, setRouteDirections] = useState<{ text: string }[] | null>(null);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [editingLocation, setEditingLocation] = useState<SavedLocation | null>(null);
     const [newLocationName, setNewLocationName] = useState('');
@@ -286,9 +286,8 @@ const LocationServicesPage: React.FC = () => {
         setIsCalculatingRoute(true);
         setIsTranslating(false);
         removeRouteFromMap();
-
-        const supportedLanguages = ['bg', 'ca', 'cs', 'da', 'de', 'el', 'en-GB', 'en', 'es', 'et', 'fi', 'fr', 'hi', 'hu', 'it', 'ja', 'nb-NO', 'nl', 'pl', 'pt-BR', 'pt', 'ro', 'ru', 'sk', 'sl', 'sv', 'tr', 'uk'];
-        const apiLang = 'en'; // Always fetch in English for consistent structure
+        
+        const apiLang = 'en';
 
         const routingUrl = `https://api.geoapify.com/v1/routing?waypoints=${origin.latitude},${origin.longitude}|${destinationInfo.latitude},${destinationInfo.longitude}&mode=drive&details=instruction_details&lang=${apiLang}&apiKey=${GEOAPIFY_API_KEY}`;
 
@@ -305,23 +304,26 @@ const LocationServicesPage: React.FC = () => {
             if (result.features?.length > 0 && routeSteps) {
                 const geometry = result.features[0].geometry;
 
-                // Display English route first
                 const englishDirections = routeSteps.map((step: any) => ({
                     text: `${step.instruction.text} (${Math.round(step.distance)}m)`
                 }));
                 setRouteDirections(englishDirections);
 
                 if (geometry && mapInstance.current?.isStyleLoaded()) {
-                    // ... (map drawing logic - no changes here)
+                    mapInstance.current.addSource('route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry } });
+                    mapInstance.current.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#4f46e5', 'line-width': 6, 'line-opacity': 0.9 } });
+                    const bounds = new maplibregl.LngLatBounds();
+                    if (geometry.type === 'MultiLineString') {
+                        geometry.coordinates.forEach((line: any) => line.forEach((point: any) => bounds.extend(point)));
+                    } else {
+                        geometry.coordinates.forEach((point: any) => bounds.extend(point));
+                    }
+                    mapInstance.current.fitBounds(bounds, { padding: { top: 50, bottom: 150, left: 50, right: 50 } });
                 }
 
-                // Now, translate if necessary
                 if (language === 'vi') {
                     setIsTranslating(true);
-                    const directionsToTranslate = routeSteps.map((step: any) => ({
-                        text: step.instruction.text,
-                        distance: step.distance
-                    }));
+                    const directionsToTranslate = routeSteps.map((step: any) => ({ text: step.instruction.text, distance: step.distance }));
                     const translated = await translateDirections(directionsToTranslate, 'vi');
                     setRouteDirections(translated);
                 }
@@ -362,7 +364,6 @@ const LocationServicesPage: React.FC = () => {
                 lang: supportedLang,
             };
 
-            // **IMPROVEMENT**: Bias search results to the user's current location
             if (currentLocationRef.current) {
                 autocompleteOptions.bias = {
                     location: {
@@ -370,6 +371,14 @@ const LocationServicesPage: React.FC = () => {
                         lat: currentLocationRef.current.latitude
                     }
                 };
+                // **NEW**: Filter results to a 50km radius
+                autocompleteOptions.filter = {
+                    circle: {
+                        lon: currentLocationRef.current.longitude,
+                        lat: currentLocationRef.current.latitude,
+                        radius_meters: 50000 
+                    }
+                }
             }
 
             geocoderRef.current = new GeocoderAutocomplete(
@@ -412,7 +421,7 @@ const LocationServicesPage: React.FC = () => {
                 }
             }
         };
-    }, [hasApiKey, language, t, calculateAndDisplayRoute, removeRouteFromMap]);
+    }, [hasApiKey, language, t, calculateAndDisplayRoute, removeRouteFromMap, currentLocation]); // Added currentLocation to dependency array
 
     // --- Handlers ---
     const handleRefreshLocation = useCallback(() => fetchLocation(
