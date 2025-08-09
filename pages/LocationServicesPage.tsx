@@ -265,7 +265,6 @@ const LocationServicesPage: React.FC = () => {
     }, []);
 
     const calculateAndDisplayRoute = useCallback(async (origin: LocationInfo, destinationInfo: LocationInfo) => {
-        // Defensive checks to prevent invalid API calls
         if (!origin || typeof origin.latitude !== 'number' || typeof origin.longitude !== 'number') {
             console.error("Route calculation cancelled: 'origin' (current location) is invalid.", origin);
             setNotification({ message: t('guideHomeError'), type: 'error' });
@@ -278,7 +277,6 @@ const LocationServicesPage: React.FC = () => {
             return;
         }
 
-
         if (!hasApiKey) {
             setNotification({ message: 'API key required for navigation', type: 'error' });
             return;
@@ -287,13 +285,15 @@ const LocationServicesPage: React.FC = () => {
         setIsCalculatingRoute(true);
         removeRouteFromMap();
 
-        const routingUrl = `https://api.geoapify.com/v1/routing?waypoints=${origin.latitude},${origin.longitude}|${destinationInfo.latitude},${destinationInfo.longitude}&mode=drive&details=instruction_details&lang=${language}&apiKey=${GEOAPIFY_API_KEY}`;
-        console.log("Calling Geoapify with URL:", routingUrl);
+        // **FIX**: Default to 'en' if the current language is not supported by the routing API
+        const supportedLanguages = ['bg', 'ca', 'cs', 'da', 'de', 'el', 'en-GB', 'en', 'es', 'et', 'fi', 'fr', 'hi', 'hu', 'it', 'ja', 'nb-NO', 'nl', 'pl', 'pt-BR', 'pt', 'ro', 'ru', 'sk', 'sl', 'sv', 'tr', 'uk'];
+        const supportedLang = supportedLanguages.includes(language) ? language : 'en';
+
+        const routingUrl = `https://api.geoapify.com/v1/routing?waypoints=${origin.latitude},${origin.longitude}|${destinationInfo.latitude},${destinationInfo.longitude}&mode=drive&details=instruction_details&lang=${supportedLang}&apiKey=${GEOAPIFY_API_KEY}`;
 
         try {
             const response = await fetch(routingUrl);
             if (!response.ok) {
-                // Try to get more specific error message from the response body
                 const errorBody = await response.json().catch(() => ({ message: 'Unknown error structure' }));
                 throw new Error(`HTTP error! status: ${response.status}. Message: ${errorBody.message || 'No message provided'}`);
             }
@@ -341,7 +341,7 @@ const LocationServicesPage: React.FC = () => {
                         setRouteDirections(routeSteps);
                     } catch (mapError) {
                         console.error('Error adding route to map:', mapError);
-                        setRouteDirections(routeSteps); // Still show directions even if map fails
+                        setRouteDirections(routeSteps);
                     }
                 } else {
                     throw new Error('Invalid route data received');
@@ -358,14 +358,12 @@ const LocationServicesPage: React.FC = () => {
         }
     }, [removeRouteFromMap, language, hasApiKey, t]);
 
-
     // Effect for initializing the geocoder autocomplete
     useEffect(() => {
         if (!destinationInputContainerRef.current || !hasApiKey) {
             return;
         }
 
-        // Clean up existing geocoder
         if (geocoderRef.current && typeof geocoderRef.current.destroy === 'function') {
             try {
                 geocoderRef.current.destroy();
@@ -375,12 +373,15 @@ const LocationServicesPage: React.FC = () => {
         }
 
         try {
+            // **FIX**: Also use the supported language for the geocoder
+            const supportedLanguages = ['bg', 'ca', 'cs', 'da', 'de', 'el', 'en-GB', 'en', 'es', 'et', 'fi', 'fr', 'hi', 'hu', 'it', 'ja', 'nb-NO', 'nl', 'pl', 'pt-BR', 'pt', 'ro', 'ru', 'sk', 'sl', 'sv', 'tr', 'uk'];
+            const supportedLang = supportedLanguages.includes(language) ? language : 'en';
+
             const autocompleteOptions: any = {
                 placeholder: t('destinationPlaceholder'),
-                lang: language,
+                lang: supportedLang, // Use the supported language
             };
 
-            // Add bias towards the user's current location if available
             if (currentLocationRef.current) {
                 autocompleteOptions.bias = {
                     location: {
@@ -497,15 +498,20 @@ const LocationServicesPage: React.FC = () => {
     }, [savedLocations, setSavedLocations, t]);
 
     const handleGuideHome = useCallback(() => {
-        // No change needed here, the check is now inside calculateAndDisplayRoute
-        calculateAndDisplayRoute(currentLocation!, homeLocation!);
-    }, [homeLocation, currentLocation, calculateAndDisplayRoute]);
+        if (currentLocation && homeLocation) {
+            calculateAndDisplayRoute(currentLocation, homeLocation);
+        } else {
+             setNotification({ message: !homeLocation ? t('guideHomeNotSetInfo') : t('guideHomeError'), type: 'info' });
+        }
+    }, [homeLocation, currentLocation, calculateAndDisplayRoute, t]);
 
     const handleGuideToDestination = useCallback(() => {
-        // No change needed here, the check is now inside calculateAndDisplayRoute
-        calculateAndDisplayRoute(currentLocation!, selectedDestination!);
-    }, [selectedDestination, currentLocation, calculateAndDisplayRoute]);
-
+        if (currentLocation && selectedDestination) {
+            calculateAndDisplayRoute(currentLocation, selectedDestination);
+        } else {
+            setNotification({ message: !selectedDestination ? t('destinationMissingInfo') : t('guideHomeError'), type: 'info' });
+        }
+    }, [selectedDestination, currentLocation, calculateAndDisplayRoute, t]);
 
     const handleReadDirections = useCallback(() => {
         if (ttsSupported && routeDirections) {
@@ -533,8 +539,9 @@ const LocationServicesPage: React.FC = () => {
     const handleCloseSaveModal = useCallback(() => setIsSaveModalOpen(false), []);
 
     const handleGuideToSavedPlace = useCallback((place: SavedLocation) => {
-         // No change needed here, the check is now inside calculateAndDisplayRoute
-        calculateAndDisplayRoute(currentLocation!, place.location);
+        if (currentLocation) {
+            calculateAndDisplayRoute(currentLocation, place.location);
+        }
     }, [currentLocation, calculateAndDisplayRoute]);
 
     return (
