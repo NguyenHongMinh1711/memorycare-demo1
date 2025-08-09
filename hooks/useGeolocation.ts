@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { LocationInfo } from '../types';
 
 interface GeolocationState {
@@ -8,24 +9,36 @@ interface GeolocationState {
   error: GeolocationPositionError | null;
 }
 
-/**
- * A custom hook to manage geolocation, including permissions and fetching the user's current location.
- * This version is improved for robustness and state consistency.
- */
 export const useGeolocation = () => {
   const [state, setState] = useState<GeolocationState>({
     permissionStatus: 'prompt',
     currentLocation: null,
-    isLoading: true, // Start as loading until permission is determined
+    isLoading: true,
     error: null,
   });
+
+  const permissionStatusRef = useRef<PermissionStatus | null>(null);
+  const isInitializedRef = useRef(false);
 
   const fetchLocation = useCallback(
     (
       onSuccess?: (loc: LocationInfo) => void,
       onError?: (err: GeolocationPositionError) => void
     ) => {
-      setState((s) => ({ ...s, isLoading: true, error: null }));
+      if (!navigator.geolocation) {
+        const error = {
+          code: 2,
+          message: 'Geolocation is not supported by this browser.',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3
+        } as GeolocationPositionError;
+        setState(s => ({ ...s, error, isLoading: false }));
+        onError?.(error);
+        return;
+      }
+
+      setState(s => ({ ...s, isLoading: true, error: null }));
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -33,64 +46,79 @@ export const useGeolocation = () => {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           };
-          setState((s) => ({ ...s, currentLocation: loc, isLoading: false, error: null }));
+          setState(s => ({ ...s, currentLocation: loc, isLoading: false, error: null }));
           onSuccess?.(loc);
         },
         (geoError) => {
-          setState((s) => ({ ...s, error: geoError, isLoading: false }));
+          setState(s => ({ ...s, error: geoError, isLoading: false }));
           onError?.(geoError);
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { 
+          enableHighAccuracy: true, 
+          timeout: 15000, 
+          maximumAge: 300000 // 5 minutes
+        }
       );
     },
     []
   );
 
-  useEffect(() => {
+  const checkPermissionAndFetch = useCallback(async () => {
     if (!navigator.permissions) {
-      // Fallback for older browsers. Assumes permission needs to be prompted.
-      // Can't know for sure, but it's a safe bet. Stop loading.
-      setState((s) => ({ ...s, permissionStatus: 'prompt', isLoading: false }));
+      setState(s => ({ ...s, permissionStatus: 'prompt', isLoading: false }));
       return;
     }
 
-    let permissionStatusRef: PermissionStatus;
-    
-    const handlePermissionChange = () => {
-        const newStatus = permissionStatusRef.state;
+    try {
+      const status = await navigator.permissions.query({ name: 'geolocation' });
+      permissionStatusRef.current = status;
+      
+      const handlePermissionChange = () => {
+        if (!permissionStatusRef.current) return;
+        
+        const newStatus = permissionStatusRef.current.state;
+        setState(s => ({ ...s, permissionStatus: newStatus }));
+        
         if (newStatus === 'granted') {
-            setState(s => ({ ...s, permissionStatus: newStatus }));
-            fetchLocation();
+          fetchLocation();
         } else {
-            // If denied or prompt, stop loading and clear location data.
-            setState(s => ({ ...s, permissionStatus: newStatus, isLoading: false, currentLocation: null }));
+          setState(s => ({ 
+            ...s, 
+            isLoading: false, 
+            currentLocation: null,
+            error: null
+          }));
         }
-    };
+      };
 
-    navigator.permissions.query({ name: 'geolocation' }).then((status) => {
-        permissionStatusRef = status;
-        const initialStatus = status.state;
-        
-        if (initialStatus === 'granted') {
-            setState(s => ({ ...s, permissionStatus: initialStatus }));
-            fetchLocation();
-        } else {
-            // Not granted initially, so we stop loading.
-            setState(s => ({ ...s, permissionStatus: initialStatus, isLoading: false }));
-        }
-        
-        status.onchange = handlePermissionChange;
-    }).catch(() => {
-        // If query fails, assume 'prompt' and stop loading.
-        setState((s) => ({ ...s, permissionStatus: 'prompt', isLoading: false }));
-    });
-    
+      status.onchange = handlePermissionChange;
+      
+      setState(s => ({ ...s, permissionStatus: status.state }));
+      
+      if (status.state === 'granted') {
+        fetchLocation();
+      } else {
+        setState(s => ({ ...s, isLoading: false }));
+      }
+      
+    } catch (error) {
+      console.warn('Permission query failed:', error);
+      setState(s => ({ ...s, permissionStatus: 'prompt', isLoading: false }));
+    }
+  }, [fetchLocation]);
+
+  useEffect(() => {
+    if (!isInitializedRef.current) {
+      isInitializedRef.current = true;
+      checkPermissionAndFetch();
+    }
+
     return () => {
-      if (permissionStatusRef) {
-        permissionStatusRef.onchange = null;
+      if (permissionStatusRef.current) {
+        permissionStatusRef.current.onchange = null;
       }
     };
-  }, [fetchLocation]);
+  }, [checkPermissionAndFetch]);
 
   return { ...state, fetchLocation };
 };
