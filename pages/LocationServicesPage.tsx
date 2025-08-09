@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import maplibregl, { LngLatBounds } from 'maplibre-gl';
 import { GeocoderAutocomplete } from '@geoapify/geocoder-autocomplete';
@@ -22,13 +21,13 @@ const GEOAPIFY_API_KEY = process.env.GEOAPIFY_API_KEY || import.meta.env.VITE_GE
 const formInputStyle = "block w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base text-slate-900 placeholder:text-slate-400";
 
 // --- Sub-components ---
-const LocationMap = React.memo<{ 
-  mapRef: React.RefObject<HTMLDivElement>; 
-  isLoading: boolean; 
-  hasLocation: boolean; 
-  permissionStatus: PermissionState; 
+const LocationMap = React.memo<{
+  mapRef: React.RefObject<HTMLDivElement>;
+  isLoading: boolean;
+  hasLocation: boolean;
+  permissionStatus: PermissionState;
   error: GeolocationPositionError | null;
-  t: (key: any) => string; 
+  t: (key: any) => string;
 }>
 (({ mapRef, isLoading, hasLocation, permissionStatus, error, t }) => (
     <div ref={mapRef} className="w-full h-64 md:h-96 bg-slate-200 flex items-center justify-center text-slate-500" role="application" aria-label="Interactive Map">
@@ -46,7 +45,7 @@ const LocationMap = React.memo<{
                 <MapPinIcon className="w-16 h-16 mx-auto text-slate-300" />
                 <p className="mt-2 text-slate-600">
                     {error ? `Error: ${error.message}` :
-                     permissionStatus === 'denied' ? t('locationRequiredForMap') : 
+                     permissionStatus === 'denied' ? t('locationRequiredForMap') :
                      t('enableLocationToBegin')}
                 </p>
             </div>
@@ -158,7 +157,7 @@ const LocationServicesPage: React.FC = () => {
     const destinationInputContainerRef = useRef<HTMLDivElement>(null);
     const currentLocationRef = useRef<LocationInfo | null>(currentLocation);
     const geocoderRef = useRef<any>(null);
-    
+
     currentLocationRef.current = currentLocation;
     const hasApiKey = Boolean(GEOAPIFY_API_KEY);
 
@@ -174,7 +173,7 @@ const LocationServicesPage: React.FC = () => {
             setNotification({ message: t('locationError', locationError.message), type: 'error' });
         }
     }, [locationError, t]);
-    
+
     useEffect(() => {
         if (permissionStatus === 'prompt') {
             setShowPermissionBanner(true);
@@ -182,7 +181,7 @@ const LocationServicesPage: React.FC = () => {
             setShowPermissionBanner(false);
         }
     }, [permissionStatus]);
-    
+
     // Effect to initialize and update the map
     useEffect(() => {
         if (!mapRef.current || !currentLocation || !hasApiKey || mapInstance.current) {
@@ -191,7 +190,7 @@ const LocationServicesPage: React.FC = () => {
 
         try {
             const style = `https://maps.geoapify.com/v1/styles/osm-bright/style.json?apiKey=${GEOAPIFY_API_KEY}`;
-            
+
             mapInstance.current = new maplibregl.Map({
                 container: mapRef.current,
                 style: style,
@@ -219,7 +218,7 @@ const LocationServicesPage: React.FC = () => {
         if (!mapInstance.current || !currentLocation) return;
 
         const userPos: [number, number] = [currentLocation.longitude, currentLocation.latitude];
-        
+
         try {
             mapInstance.current.flyTo({ center: userPos, zoom: 16 });
 
@@ -266,6 +265,20 @@ const LocationServicesPage: React.FC = () => {
     }, []);
 
     const calculateAndDisplayRoute = useCallback(async (origin: LocationInfo, destinationInfo: LocationInfo) => {
+        // Defensive checks to prevent invalid API calls
+        if (!origin || typeof origin.latitude !== 'number' || typeof origin.longitude !== 'number') {
+            console.error("Route calculation cancelled: 'origin' (current location) is invalid.", origin);
+            setNotification({ message: t('guideHomeError'), type: 'error' });
+            return;
+        }
+
+        if (!destinationInfo || typeof destinationInfo.latitude !== 'number' || typeof destinationInfo.longitude !== 'number') {
+            console.error("Route calculation cancelled: 'destinationInfo' (destination) is invalid.", destinationInfo);
+            setNotification({ message: t('destinationMissingInfo'), type: 'info' });
+            return;
+        }
+
+
         if (!hasApiKey) {
             setNotification({ message: 'API key required for navigation', type: 'error' });
             return;
@@ -273,15 +286,18 @@ const LocationServicesPage: React.FC = () => {
 
         setIsCalculatingRoute(true);
         removeRouteFromMap();
-        
+
         const routingUrl = `https://api.geoapify.com/v1/routing?waypoints=${origin.latitude},${origin.longitude}|${destinationInfo.latitude},${destinationInfo.longitude}&mode=drive&details=instruction_details&lang=${language}&apiKey=${GEOAPIFY_API_KEY}`;
-        
+        console.log("Calling Geoapify with URL:", routingUrl);
+
         try {
             const response = await fetch(routingUrl);
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                // Try to get more specific error message from the response body
+                const errorBody = await response.json().catch(() => ({ message: 'Unknown error structure' }));
+                throw new Error(`HTTP error! status: ${response.status}. Message: ${errorBody.message || 'No message provided'}`);
             }
-            
+
             const result = await response.json();
 
             if (result.features?.length > 0) {
@@ -290,19 +306,19 @@ const LocationServicesPage: React.FC = () => {
 
                 if (geometry && routeSteps && mapInstance.current?.isStyleLoaded()) {
                     try {
-                        mapInstance.current.addSource('route', { 
-                            type: 'geojson', 
-                            data: { type: 'Feature', properties: {}, geometry } 
+                        mapInstance.current.addSource('route', {
+                            type: 'geojson',
+                            data: { type: 'Feature', properties: {}, geometry }
                         });
-                        
-                        mapInstance.current.addLayer({ 
-                            id: 'route', 
-                            type: 'line', 
-                            source: 'route', 
-                            layout: { 'line-join': 'round', 'line-cap': 'round' }, 
-                            paint: { 'line-color': '#4f46e5', 'line-width': 6, 'line-opacity': 0.9 } 
+
+                        mapInstance.current.addLayer({
+                            id: 'route',
+                            type: 'line',
+                            source: 'route',
+                            layout: { 'line-join': 'round', 'line-cap': 'round' },
+                            paint: { 'line-color': '#4f46e5', 'line-width': 6, 'line-opacity': 0.9 }
                         });
-                        
+
                         const coordinates = geometry.coordinates;
                         const bounds = new maplibregl.LngLatBounds();
 
@@ -318,10 +334,10 @@ const LocationServicesPage: React.FC = () => {
                             });
                         }
 
-                        mapInstance.current.fitBounds(bounds, { 
-                            padding: { top: 50, bottom: 150, left: 50, right: 50 } 
+                        mapInstance.current.fitBounds(bounds, {
+                            padding: { top: 50, bottom: 150, left: 50, right: 50 }
                         });
-                        
+
                         setRouteDirections(routeSteps);
                     } catch (mapError) {
                         console.error('Error adding route to map:', mapError);
@@ -340,7 +356,8 @@ const LocationServicesPage: React.FC = () => {
         } finally {
             setIsCalculatingRoute(false);
         }
-    }, [removeRouteFromMap, language, hasApiKey]);
+    }, [removeRouteFromMap, language, hasApiKey, t]);
+
 
     // Effect for initializing the geocoder autocomplete
     useEffect(() => {
@@ -362,6 +379,16 @@ const LocationServicesPage: React.FC = () => {
                 placeholder: t('destinationPlaceholder'),
                 lang: language,
             };
+
+            // Add bias towards the user's current location if available
+            if (currentLocationRef.current) {
+                autocompleteOptions.bias = {
+                    location: {
+                        lon: currentLocationRef.current.longitude,
+                        lat: currentLocationRef.current.latitude
+                    }
+                };
+            }
 
             geocoderRef.current = new GeocoderAutocomplete(
                 destinationInputContainerRef.current,
@@ -395,7 +422,7 @@ const LocationServicesPage: React.FC = () => {
             console.error('Geocoder initialization error:', error);
             setNotification({ message: 'Failed to initialize address search', type: 'error' });
         }
-        
+
         return () => {
             if (geocoderRef.current && typeof geocoderRef.current.destroy === 'function') {
                 try {
@@ -412,7 +439,7 @@ const LocationServicesPage: React.FC = () => {
         () => setNotification({ message: t('locationRefreshedSuccess'), type: 'success' }),
         (error) => setNotification({ message: `Location error: ${error.message}`, type: 'error' })
     ), [fetchLocation, t]);
-    
+
     const handleRequestPermission = useCallback(() => {
         setShowPermissionBanner(false);
         handleRefreshLocation();
@@ -427,7 +454,7 @@ const LocationServicesPage: React.FC = () => {
             setNotification({ message: t('homeSetError'), type: 'error' });
         }
     }, [currentLocation, setHomeLocation, t, ttsSupported, speak]);
-    
+
     const handleOpenSaveModal = useCallback((loc: SavedLocation | null) => {
         setEditingLocation(loc);
         setNewLocationName(loc ? loc.name : '');
@@ -436,9 +463,9 @@ const LocationServicesPage: React.FC = () => {
 
     const handleSaveOrUpdateLocation = useCallback((e: React.FormEvent) => {
         e.preventDefault();
-        if (!newLocationName.trim()) { 
-            setNotification({ message: t('locationNameRequired'), type: 'error' }); 
-            return; 
+        if (!newLocationName.trim()) {
+            setNotification({ message: t('locationNameRequired'), type: 'error' });
+            return;
         }
 
         if (editingLocation) {
@@ -446,21 +473,21 @@ const LocationServicesPage: React.FC = () => {
             setSavedLocations(prev => prev.map(loc => loc.id === updated.id ? updated : loc));
             setNotification({ message: t('savedLocationUpdatedSuccess', updated.name), type: 'success' });
         } else {
-            if (!currentLocation) { 
-                setNotification({ message: t('homeSetError'), type: 'error' }); 
-                return; 
+            if (!currentLocation) {
+                setNotification({ message: t('homeSetError'), type: 'error' });
+                return;
             }
-            const newLoc: SavedLocation = { 
-                id: Date.now().toString(), 
-                name: newLocationName.trim(), 
-                location: currentLocation 
+            const newLoc: SavedLocation = {
+                id: Date.now().toString(),
+                name: newLocationName.trim(),
+                location: currentLocation
             };
             setSavedLocations(prev => [...prev, newLoc]);
             setNotification({ message: t('locationSavedSuccess', newLoc.name), type: 'success' });
         }
         setIsSaveModalOpen(false);
     }, [newLocationName, editingLocation, currentLocation, setSavedLocations, t]);
-    
+
     const handleDeleteLocation = useCallback((id: string) => {
         const loc = savedLocations.find(l => l.id === id);
         if (loc && window.confirm(t('confirmDeleteLocation', loc.name))) {
@@ -470,28 +497,15 @@ const LocationServicesPage: React.FC = () => {
     }, [savedLocations, setSavedLocations, t]);
 
     const handleGuideHome = useCallback(() => {
-        if (!homeLocation) { 
-            setNotification({ message: t('guideHomeNotSetInfo'), type: 'info' }); 
-            return; 
-        }
-        if (!currentLocation) { 
-            setNotification({ message: t('guideHomeError'), type: 'error' }); 
-            return; 
-        }
-        calculateAndDisplayRoute(currentLocation, homeLocation);
-    }, [homeLocation, currentLocation, calculateAndDisplayRoute, t]);
+        // No change needed here, the check is now inside calculateAndDisplayRoute
+        calculateAndDisplayRoute(currentLocation!, homeLocation!);
+    }, [homeLocation, currentLocation, calculateAndDisplayRoute]);
 
     const handleGuideToDestination = useCallback(() => {
-        if (!selectedDestination) { 
-            setNotification({ message: t('destinationMissingInfo'), type: 'info' }); 
-            return; 
-        }
-        if (!currentLocation) { 
-            setNotification({ message: t('guideHomeError'), type: 'error' }); 
-            return; 
-        }
-        calculateAndDisplayRoute(currentLocation, selectedDestination);
-    }, [selectedDestination, currentLocation, calculateAndDisplayRoute, t]);
+        // No change needed here, the check is now inside calculateAndDisplayRoute
+        calculateAndDisplayRoute(currentLocation!, selectedDestination!);
+    }, [selectedDestination, currentLocation, calculateAndDisplayRoute]);
+
 
     const handleReadDirections = useCallback(() => {
         if (ttsSupported && routeDirections) {
@@ -502,11 +516,11 @@ const LocationServicesPage: React.FC = () => {
 
     const handleNotifyFamily = useCallback(() => {
         if (familyEmails.length === 0) {
-            setNotification({ message: t('notifyFamilyNoEmails'), type: 'error' }); 
+            setNotification({ message: t('notifyFamilyNoEmails'), type: 'error' });
             return;
         }
         if (!currentLocation) {
-            setNotification({ message: t('homeSetError'), type: 'error' }); 
+            setNotification({ message: t('homeSetError'), type: 'error' });
             return;
         }
         const { latitude, longitude } = currentLocation;
@@ -515,16 +529,13 @@ const LocationServicesPage: React.FC = () => {
     }, [familyEmails, currentLocation, t]);
 
     const handleOpenSaveSpotModal = useCallback(() => handleOpenSaveModal(null), [handleOpenSaveModal]);
-    
+
     const handleCloseSaveModal = useCallback(() => setIsSaveModalOpen(false), []);
-    
+
     const handleGuideToSavedPlace = useCallback((place: SavedLocation) => {
-        if (!currentLocation) { 
-            setNotification({ message: t('guideHomeError'), type: 'error' }); 
-            return; 
-        }
-        calculateAndDisplayRoute(currentLocation, place.location);
-    }, [currentLocation, calculateAndDisplayRoute, t]);
+         // No change needed here, the check is now inside calculateAndDisplayRoute
+        calculateAndDisplayRoute(currentLocation!, place.location);
+    }, [currentLocation, calculateAndDisplayRoute]);
 
     return (
         <div className="space-y-10 animate-fadeIn">
@@ -534,7 +545,7 @@ const LocationServicesPage: React.FC = () => {
             {ttsError && <NotificationBanner message={`Text-to-speech error: ${ttsError}`} type="error" onDismiss={() => {}} />}
             {mapInitError && <NotificationBanner message={mapInitError} type="error" onDismiss={() => setMapInitError(null)} />}
             {showPermissionBanner && <LocationPermissionBanner onRequestPermission={handleRequestPermission} onDismiss={() => setShowPermissionBanner(false)} />}
-            
+
             {permissionStatus === 'denied' && (
                 <div className="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-r-lg mb-6 flex items-start gap-3" role="alert">
                     <MapPinIcon className="w-6 h-6 mr-3 flex-shrink-0" />
@@ -544,15 +555,15 @@ const LocationServicesPage: React.FC = () => {
                     </div>
                 </div>
             )}
-            
+
             <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                <LocationMap 
-                    mapRef={mapRef} 
-                    isLoading={isLoadingLocation} 
-                    hasLocation={!!currentLocation} 
-                    permissionStatus={permissionStatus} 
+                <LocationMap
+                    mapRef={mapRef}
+                    isLoading={isLoadingLocation}
+                    hasLocation={!!currentLocation}
+                    permissionStatus={permissionStatus}
                     error={locationError}
-                    t={t} 
+                    t={t}
                 />
                 <CurrentLocationCard
                     currentLocation={currentLocation}
@@ -564,7 +575,7 @@ const LocationServicesPage: React.FC = () => {
                     t={t}
                 />
             </div>
-            
+
             <NavigationCard
                 destinationInputContainerRef={destinationInputContainerRef}
                 isCalculatingRoute={isCalculatingRoute}
@@ -576,7 +587,7 @@ const LocationServicesPage: React.FC = () => {
                 hasApiKey={hasApiKey}
                 t={t}
             />
-            
+
             <div className="bg-white p-4 md:p-6 rounded-xl shadow-md space-y-4">
                 <h3 className="text-xl font-bold text-slate-800">{t('savedPlacesSectionTitle')}</h3>
                 {savedLocations.length === 0 ? (
@@ -599,7 +610,7 @@ const LocationServicesPage: React.FC = () => {
                     </div>
                 )}
             </div>
-            
+
             <div className="bg-white p-6 rounded-xl shadow-md">
                 <h3 className="text-xl font-bold text-slate-800 mb-4">{t('safetyActionsTitle')}</h3>
                 <Button onClick={handleNotifyFamily} size="md" variant="danger">{t('notifyFamilyButton')}</Button>
