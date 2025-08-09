@@ -93,7 +93,7 @@ const NavigationCard = React.memo<{
     onGuideHome: () => void;
     onReadDirections: () => void;
     hasApiKey: boolean;
-    isLocationReady: boolean; // New prop
+    isLocationReady: boolean;
     t: (key: any, ...args: any[]) => string;
 }>((props) => {
     const { destinationInputContainerRef, isCalculatingRoute, isTranslating, routeDirections, selectedDestination, onGuideToDestination, onGuideHome, onReadDirections, hasApiKey, isLocationReady, t } = props;
@@ -242,23 +242,6 @@ const LocationServicesPage: React.FC = () => {
         }
     }, [currentLocation]);
 
-    // Effect to cleanup map on component unmount
-    useEffect(() => {
-        return () => {
-            if (geocoderRef.current && typeof geocoderRef.current.destroy === 'function') {
-                try {
-                    geocoderRef.current.destroy();
-                } catch (error) {
-                    console.warn('Error destroying geocoder:', error);
-                }
-            }
-            if (mapInstance.current) {
-                mapInstance.current.remove();
-                mapInstance.current = null;
-            }
-        };
-    }, []);
-
     const removeRouteFromMap = useCallback(() => {
         if (mapInstance.current?.isStyleLoaded()) {
             const map = mapInstance.current;
@@ -346,20 +329,20 @@ const LocationServicesPage: React.FC = () => {
         }
     }, [removeRouteFromMap, language, hasApiKey, t]);
 
-    // **MAJOR CHANGE**: This useEffect now initializes the geocoder only when currentLocation is available.
     useEffect(() => {
-        // Do not initialize if API key is missing or the container isn't ready
         if (!hasApiKey || !destinationInputContainerRef.current) {
             return;
         }
 
-        // Destroy any existing instance before creating a new one
         if (geocoderRef.current) {
             geocoderRef.current.destroy();
             geocoderRef.current = null;
         }
+        
+        // Clear the container's HTML content before initializing a new geocoder
+        destinationInputContainerRef.current.innerHTML = '';
 
-        // **Only initialize when location is known**
+
         if (currentLocation) {
             try {
                 const supportedLanguages = ['bg', 'ca', 'cs', 'da', 'de', 'el', 'en-GB', 'en', 'es', 'et', 'fi', 'fr', 'hi', 'hu', 'it', 'ja', 'nb-NO', 'nl', 'pl', 'pt-BR', 'pt', 'ro', 'ru', 'sk', 'sl', 'sv', 'tr', 'uk'];
@@ -412,15 +395,7 @@ const LocationServicesPage: React.FC = () => {
                 setNotification({ message: 'Failed to initialize address search', type: 'error' });
             }
         }
-
-        // Cleanup function
-        return () => {
-            if (geocoderRef.current) {
-                geocoderRef.current.destroy();
-                geocoderRef.current = null;
-            }
-        };
-    }, [hasApiKey, language, t, currentLocation, calculateAndDisplayRoute, removeRouteFromMap]); // Dependency is now currentLocation
+    }, [hasApiKey, language, t, currentLocation, calculateAndDisplayRoute, removeRouteFromMap]);
 
     // --- Handlers ---
     const handleRefreshLocation = useCallback(() => fetchLocation(
@@ -567,6 +542,7 @@ const LocationServicesPage: React.FC = () => {
             </div>
 
             <NavigationCard
+                key={currentLocation ? 'ready' : 'waiting'} // **KEY CHANGE**
                 destinationInputContainerRef={destinationInputContainerRef}
                 isCalculatingRoute={isCalculatingRoute}
                 isTranslating={isTranslating}
