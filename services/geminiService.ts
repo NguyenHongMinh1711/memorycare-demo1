@@ -94,6 +94,56 @@ export const parseJsonFromGeminiResponse = <T,>(textResponse: string): T | null 
   }
 };
 
+export const translateDirections = async (directions: { text: string, distance: number }[], targetLanguage: 'vi' | 'en'): Promise<{ text: string }[]> => {
+    if (!API_KEY || targetLanguage === 'en' || directions.length === 0) {
+        return directions.map(d => ({ text: `${d.text} (${Math.round(d.distance)}m)` }));
+    }
+
+    const systemInstruction = `You are a helpful translation assistant. Your task is to translate driving directions into natural-sounding Vietnamese. For each step, combine the instruction text and the distance into a single, clear instruction. For example, if the input is '{"instruction": "Turn left", "distance": 100}', a good output would be '{"translation": "Rẽ trái và đi tiếp 100 mét."}'. If the instruction already contains a street name, like 'Drive on Main St.', format it as 'Đi trên đường Main St. khoảng 200 mét.'. Always return a JSON object with a "translations" key, which is an array of strings.`;
+
+    const prompt = `Please translate the following driving directions into Vietnamese. Each step includes an instruction and a distance in meters. Combine them into a single, natural instruction for each step.
+    
+    Input (Array of objects): ${JSON.stringify(directions.map(d => ({ instruction: d.text, distance: Math.round(d.distance) })))}
+
+    Return a JSON object with a single key "translations" which is an array of the translated strings. For example: {"translations": ["Chỉ dẫn 1", "Chỉ dẫn 2"]}`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: GEMINI_TEXT_MODEL,
+            contents: prompt,
+            config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        translations: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.STRING
+                            },
+                        }
+                    }
+                }
+            },
+        });
+
+        const result = parseJsonFromGeminiResponse<{ translations: string[] }>(response.text);
+
+        if (result && result.translations && result.translations.length === directions.length) {
+            return result.translations.map(t => ({ text: t }));
+        }
+        // Fallback if translation fails
+        throw new Error("Translation result did not match expected format.");
+
+    } catch (error) {
+        console.error("Error translating directions with Gemini:", error);
+        // Fallback: return English with distance if translation fails
+        return directions.map(d => ({ text: `${d.text} (${Math.round(d.distance)}m)` }));
+    }
+};
+
+
 export const generateTagsForJournal = async (journalText: string, language: 'en' | 'vi' = 'en'): Promise<string[]> => {
   if (!API_KEY) return [];
   const languageName = language === 'vi' ? 'Vietnamese' : 'English';
