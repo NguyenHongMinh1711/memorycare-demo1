@@ -93,9 +93,10 @@ const NavigationCard = React.memo<{
     onGuideHome: () => void;
     onReadDirections: () => void;
     hasApiKey: boolean;
+    isLocationReady: boolean; // New prop
     t: (key: any, ...args: any[]) => string;
 }>((props) => {
-    const { destinationInputContainerRef, isCalculatingRoute, isTranslating, routeDirections, selectedDestination, onGuideToDestination, onGuideHome, onReadDirections, hasApiKey, t } = props;
+    const { destinationInputContainerRef, isCalculatingRoute, isTranslating, routeDirections, selectedDestination, onGuideToDestination, onGuideHome, onReadDirections, hasApiKey, isLocationReady, t } = props;
 
     return (
         <div className="bg-white p-4 md:p-6 rounded-xl shadow-md space-y-4">
@@ -108,7 +109,13 @@ const NavigationCard = React.memo<{
             <div className="flex flex-col md:flex-row gap-4 items-end">
                 <div className="w-full md:flex-1">
                     <label htmlFor="destinationInput" className="block text-sm font-medium text-slate-700 mb-1">{t('destinationLabel')}</label>
-                    <div id="destinationInput" ref={destinationInputContainerRef} className="autocomplete-container" />
+                    <div id="destinationInput" ref={destinationInputContainerRef}>
+                        {!isLocationReady && (
+                             <div className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 rounded-lg text-slate-500 italic">
+                                {t('findingLocation')}
+                             </div>
+                        )}
+                    </div>
                 </div>
                 <div className="flex items-end gap-3 w-full md:w-auto">
                     <Button onClick={onGuideToDestination} disabled={!hasApiKey || isCalculatingRoute || !selectedDestination} isLoading={isCalculatingRoute && !!selectedDestination} leftIcon={<MapPinIcon className="w-5 h-5" />} size="md" variant="secondary" className="flex-1 md:flex-initial">{t('guideToDestinationButton')}</Button>
@@ -158,10 +165,8 @@ const LocationServicesPage: React.FC = () => {
     const mapInstance = useRef<maplibregl.Map | null>(null);
     const userMarker = useRef<maplibregl.Marker | null>(null);
     const destinationInputContainerRef = useRef<HTMLDivElement>(null);
-    const currentLocationRef = useRef<LocationInfo | null>(currentLocation);
     const geocoderRef = useRef<any>(null);
 
-    currentLocationRef.current = currentLocation;
     const hasApiKey = Boolean(GEOAPIFY_API_KEY);
 
     // Effects
@@ -341,87 +346,81 @@ const LocationServicesPage: React.FC = () => {
         }
     }, [removeRouteFromMap, language, hasApiKey, t]);
 
-    // Effect for initializing the geocoder autocomplete
+    // **MAJOR CHANGE**: This useEffect now initializes the geocoder only when currentLocation is available.
     useEffect(() => {
-        if (!destinationInputContainerRef.current || !hasApiKey) {
+        // Do not initialize if API key is missing or the container isn't ready
+        if (!hasApiKey || !destinationInputContainerRef.current) {
             return;
         }
 
-        if (geocoderRef.current && typeof geocoderRef.current.destroy === 'function') {
-            try {
-                geocoderRef.current.destroy();
-            } catch (error) {
-                console.warn('Error destroying existing geocoder:', error);
-            }
+        // Destroy any existing instance before creating a new one
+        if (geocoderRef.current) {
+            geocoderRef.current.destroy();
+            geocoderRef.current = null;
         }
 
-        try {
-            const supportedLanguages = ['bg', 'ca', 'cs', 'da', 'de', 'el', 'en-GB', 'en', 'es', 'et', 'fi', 'fr', 'hi', 'hu', 'it', 'ja', 'nb-NO', 'nl', 'pl', 'pt-BR', 'pt', 'ro', 'ru', 'sk', 'sl', 'sv', 'tr', 'uk'];
-            const supportedLang = supportedLanguages.includes(language) ? language : 'en';
+        // **Only initialize when location is known**
+        if (currentLocation) {
+            try {
+                const supportedLanguages = ['bg', 'ca', 'cs', 'da', 'de', 'el', 'en-GB', 'en', 'es', 'et', 'fi', 'fr', 'hi', 'hu', 'it', 'ja', 'nb-NO', 'nl', 'pl', 'pt-BR', 'pt', 'ro', 'ru', 'sk', 'sl', 'sv', 'tr', 'uk'];
+                const supportedLang = supportedLanguages.includes(language) ? language : 'en';
 
-            const autocompleteOptions: any = {
-                placeholder: t('destinationPlaceholder'),
-                lang: supportedLang,
-            };
-
-            if (currentLocationRef.current) {
-                autocompleteOptions.bias = {
-                    location: {
-                        lon: currentLocationRef.current.longitude,
-                        lat: currentLocationRef.current.latitude
+                const autocompleteOptions: any = {
+                    placeholder: t('destinationPlaceholder'),
+                    lang: supportedLang,
+                    bias: {
+                        location: {
+                            lon: currentLocation.longitude,
+                            lat: currentLocation.latitude
+                        }
+                    },
+                    filter: {
+                        circle: {
+                            lon: currentLocation.longitude,
+                            lat: currentLocation.latitude,
+                            radius_meters: 50000 
+                        }
                     }
                 };
-                // **NEW**: Filter results to a 50km radius
-                autocompleteOptions.filter = {
-                    circle: {
-                        lon: currentLocationRef.current.longitude,
-                        lat: currentLocationRef.current.latitude,
-                        radius_meters: 50000 
+
+                geocoderRef.current = new GeocoderAutocomplete(
+                    destinationInputContainerRef.current,
+                    GEOAPIFY_API_KEY,
+                    autocompleteOptions
+                );
+
+                geocoderRef.current.on('select', (location: any) => {
+                    if (location) {
+                        const newDestination: LocationInfo = {
+                            latitude: location.properties.lat,
+                            longitude: location.properties.lon,
+                            address: location.properties.formatted,
+                        };
+                        setSelectedDestination(newDestination);
+                        calculateAndDisplayRoute(currentLocation, newDestination);
                     }
-                }
+                });
+
+                geocoderRef.current.on('input', (value: string) => {
+                    if (!value) {
+                        removeRouteFromMap();
+                        setSelectedDestination(null);
+                    }
+                });
+            } catch (error) {
+                console.error('Geocoder initialization error:', error);
+                setNotification({ message: 'Failed to initialize address search', type: 'error' });
             }
-
-            geocoderRef.current = new GeocoderAutocomplete(
-                destinationInputContainerRef.current,
-                GEOAPIFY_API_KEY,
-                autocompleteOptions
-            );
-
-            geocoderRef.current.on('select', (location: any) => {
-                if (location) {
-                    const newDestination: LocationInfo = {
-                        latitude: location.properties.lat,
-                        longitude: location.properties.lon,
-                        address: location.properties.formatted,
-                    };
-                    setSelectedDestination(newDestination);
-                    if (currentLocationRef.current) {
-                        calculateAndDisplayRoute(currentLocationRef.current, newDestination);
-                    }
-                }
-            });
-
-            geocoderRef.current.on('input', (value: string) => {
-                if (!value) {
-                    removeRouteFromMap();
-                    setSelectedDestination(null);
-                }
-            });
-        } catch (error) {
-            console.error('Geocoder initialization error:', error);
-            setNotification({ message: 'Failed to initialize address search', type: 'error' });
         }
 
+        // Cleanup function
         return () => {
-            if (geocoderRef.current && typeof geocoderRef.current.destroy === 'function') {
-                try {
-                    geocoderRef.current.destroy();
-                } catch (error) {
-                    console.warn('Error destroying geocoder in cleanup:', error);
-                }
+            if (geocoderRef.current) {
+                geocoderRef.current.destroy();
+                geocoderRef.current = null;
             }
         };
-    }, [hasApiKey, language, t, calculateAndDisplayRoute, removeRouteFromMap, currentLocation]); // Added currentLocation to dependency array
+    }, [hasApiKey, language, t, currentLocation, calculateAndDisplayRoute, removeRouteFromMap]); // Dependency is now currentLocation
 
     // --- Handlers ---
     const handleRefreshLocation = useCallback(() => fetchLocation(
@@ -577,6 +576,7 @@ const LocationServicesPage: React.FC = () => {
                 onGuideToDestination={handleGuideToDestination}
                 onReadDirections={handleReadDirections}
                 hasApiKey={hasApiKey}
+                isLocationReady={!!currentLocation}
                 t={t}
             />
 
