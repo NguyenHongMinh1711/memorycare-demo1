@@ -5,7 +5,6 @@ import MemoryLogPage from '../pages/MemoryLogPage';
 import ActivityPlannerPage from '../pages/ActivityPlannerPage';
 import LocationServicesPage from '../pages/LocationServicesPage';
 import SettingsPage from '../pages/FamilySettingsPage';
-import MyStoryPage from '../pages/MyStoryPage'; // Import the new page
 import { HomeIcon, BookOpenIcon, CalendarIcon, MapPinIcon, Cog6ToothIcon, PencilIcon } from '../constants';
 import { useTranslation } from '../contexts';
 
@@ -16,7 +15,6 @@ const MainLayout: React.FC = () => {
   const navItems = [
     { path: '/', label: t('navHome'), icon: <HomeIcon className="w-6 h-6" /> },
     { path: '/memory-log', label: t('navMemoryLog'), icon: <BookOpenIcon className="w-6 h-6" /> },
-    { path: '/my-story', label: t('navMyStory'), icon: <PencilIcon className="w-6 h-6" /> },
     { path: '/activity-planner', label: t('navPlanner'), icon: <CalendarIcon className="w-6 h-6" /> },
     { path: '/location', label: t('navLocation'), icon: <MapPinIcon className="w-6 h-6" /> },
     { path: '/settings', label: t('navSettings'), icon: <Cog6ToothIcon className="w-6 h-6" /> },
@@ -68,7 +66,6 @@ const MainLayout: React.FC = () => {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/memory-log" element={<MemoryLogPage />} />
-            <Route path="/my-story" element={<MyStoryPage />} />
             <Route path="/activity-planner" element={<ActivityPlannerPage />} />
             <Route path="/location" element={<LocationServicesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
