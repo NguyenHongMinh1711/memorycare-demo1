@@ -285,7 +285,7 @@ const MemoryLogPage: React.FC = () => {
     const peopleContext = people.length > 0 
         ? `Here is a list of important people: ${JSON.stringify(people.map(p => ({name: p.name, relationship: p.relationship, keyInfo: p.keyInfoSummary || p.keyInfo})))}. Answer questions about them based only on this information.`
         : "There are no people saved in the memory log yet.";
-    return `You are a friendly and patient assistant for a person with memory care needs. Your primary role is to help them recall information about people they know. ${peopleContext} If asked about someone not on the list, say you don't have information about them. Keep your answers simple, clear, and comforting.`;
+    return `You are a friendly and patient assistant for a person with memory care needs. Your primary role is to help them recall information about people they know. ${peopleContext} If asked about someone not on the list, say you don't have information about them. Keep your answers simple, clear, and comforting. If the user asks about topics unrelated to their memories or the people in their log, gently guide them back to the main purpose. For example, say 'That's an interesting question, but my main role is to help you remember. Shall we talk about one of your loved ones?'`;
   }, [people]);
 
   return (
