@@ -111,8 +111,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ systemInstruction }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 animate-fadeIn">
-      <div className="bg-slate-50 rounded-xl shadow-2xl w-full max-w-lg h-[90vh] max-h-[700px] flex flex-col animate-scaleIn">
+    <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-2 sm:p-4 animate-fadeIn">
+      <div className="bg-slate-50 rounded-xl shadow-2xl w-full max-w-lg h-full sm:h-[90vh] max-h-[700px] flex flex-col animate-scaleIn">
         <header className="flex justify-between items-center p-4 border-b border-slate-200 flex-shrink-0 bg-slate-100 rounded-t-xl">
           <h2 className="text-lg font-semibold text-indigo-800 flex items-center">
             <SparklesIcon className="w-6 h-6 mr-2" />
